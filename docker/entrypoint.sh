@@ -11,9 +11,12 @@ if [ -z "$APP_KEY" ]; then
     php artisan key:generate
 fi
 
-if [ ! -f database/database.sqlite ]; then
-    touch database/database.sqlite
-fi
+echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT}..."
+until mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USERNAME" -p"$DB_PASSWORD" -e "SELECT 1" > /dev/null 2>&1; do
+    echo "MySQL is not ready yet. Retrying in 2 seconds..."
+    sleep 2
+done
+echo "MySQL is ready."
 
 php artisan migrate --force
 
