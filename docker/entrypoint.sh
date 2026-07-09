@@ -1,6 +1,6 @@
-#!/bin/sh
-set -e
+#!/bin/bash
 
+# Generate app key if missing
 if [ ! -f .env ]; then
     cp .env.example .env
 fi
@@ -12,34 +12,17 @@ if [ -z "$APP_KEY" ]; then
     php artisan key:generate --ansi
 fi
 
-echo "DB_HOST=${DB_HOST}, DB_PORT=${DB_PORT}, DB_USERNAME=${DB_USERNAME}"
-echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT}..."
-
-MAX_RETRIES=30
-RETRIES=0
-
-while ! mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USERNAME" -p"$DB_PASSWORD" -e "SELECT 1" > /dev/null 2>&1; do
-    RETRIES=$((RETRIES + 1))
-    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
-        echo "MySQL did not become ready after ${MAX_RETRIES} attempts. Exiting."
-        exit 1
-    fi
-    echo "MySQL is not ready yet. Retry ${RETRIES}/${MAX_RETRIES}..."
+# Wait for MySQL to be reachable before running artisan commands
+echo "Waiting for database at ${DB_HOST}:${DB_PORT}..."
+until php -r "new PDO('mysql:host='.getenv('DB_HOST').';port='.getenv('DB_PORT').';dbname='.getenv('DB_DATABASE'), getenv('DB_USERNAME'), getenv('DB_PASSWORD'));" 2>/dev/null; do
     sleep 2
 done
+echo "Database is ready."
 
-echo "MySQL is ready."
+php artisan config:clear
+php artisan view:clear
+php artisan cache:clear || true
+php artisan migrate --force || true
+php artisan storage:link --force || true
 
-echo "Running migrations..."
-php artisan migrate --force --ansi || {
-    echo "Migration failed. Check database connectivity and schema."
-    exit 1
-}
-
-echo "Caching config, routes, and views..."
-php artisan config:cache --ansi
-php artisan route:cache --ansi
-php artisan view:cache --ansi
-
-echo "Starting Apache..."
 exec "$@"
