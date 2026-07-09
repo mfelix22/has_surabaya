@@ -49,10 +49,14 @@ COPY --from=node-builder /app/public/build ./public/build
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
+# Bundle uploaded files as a seed so the volume can be pre-populated on first start
+RUN cp -r storage/app/public /var/www/storage_seed
+
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache \
-    && chmod -R 755 /var/www/html/database
+    && chmod -R 755 /var/www/html/database \
+    && chown -R www-data:www-data /var/www/storage_seed
 
 COPY docker/apache/000-default.conf /etc/apache2/sites-available/000-default.conf
 

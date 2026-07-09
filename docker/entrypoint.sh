@@ -23,6 +23,17 @@ php artisan config:clear
 php artisan view:clear
 php artisan cache:clear || true
 php artisan migrate --force || true
+
+# Restore seed files (signatures, ppj_attachments, etc.) from image into the volume
+# -n flag = skip existing files so user re-uploads are never overwritten
+if [ -d /var/www/storage_seed ]; then
+    echo "Seeding storage from image (skipping existing files)..."
+    cp -rn /var/www/storage_seed/. storage/app/public/
+    chown -R www-data:www-data storage/app/public/
+    echo "Storage seed complete."
+fi
+
+# Recreate the public/storage symlink (removes stale folder first)
 rm -rf public/storage
 php artisan storage:link --force || true
 
