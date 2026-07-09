@@ -13,18 +13,20 @@ RUN npm run build
 
 FROM php:8.3-apache
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
     libzip-dev \
+    libsqlite3-dev \
     unzip \
     curl \
     libonig-dev \
     libxml2-dev \
     libssl-dev \
+    default-mysql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd mbstring xml zip pdo pdo_sqlite opcache bcmath exif \
+    && docker-php-ext-install -j$(nproc) gd mbstring xml zip pdo pdo_mysql pdo_sqlite opcache bcmath exif \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
