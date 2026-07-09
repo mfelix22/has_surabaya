@@ -38,7 +38,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "50306:3306"
     restart: unless-stopped
 
   phpmyadmin:
@@ -50,7 +50,7 @@ services:
       PMA_USER: root
       PMA_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5051:80"
+      - "5031:80"
     depends_on:
       - mysql
     restart: unless-stopped
