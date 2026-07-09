@@ -41,7 +41,7 @@
                         @endif
                         @if (in_array($purchaseOrder->status, ['approved', 'partial', 'received', 'completed', 'closed_shortage', 'printed']))
                             @if (\App\Helpers\PermissionHelper::canPrint('purchase_orders'))
-                                <a href="{{ \URL::temporarySignedRoute('purchase_orders.print', now()->addMinutes(5), $purchaseOrder) }}"
+                                <a href="{{ \URL::temporarySignedRoute('purchase_orders.print', now()->addMinutes(5), $purchaseOrder, false) }}"
                                     class="btn btn-secondary btn-sm" target="_blank">
                                     <i class="fas fa-print"></i>
                                     {{ $purchaseOrder->printed_at ? 'Reprint' : 'Print' }}
@@ -449,7 +449,7 @@
                             <td>{{ $purchaseOrder->creator->name }}</td>
                             <td>
                                 @if ($purchaseOrder->creator->signature_path)
-                                    <img src="{{ route('users.signature', $purchaseOrder->creator) }}" alt="Signature"
+                                    <img src="{{ route('users.signature', $purchaseOrder->creator, false) }}" alt="Signature"
                                         style="max-width: 80px; max-height: 40px;">
                                 @else
                                     <span class="text-muted text-sm">-</span>
@@ -471,7 +471,7 @@
                             </td>
                             <td>
                                 @if ($purchaseOrder->approver && $purchaseOrder->approver->signature_path)
-                                    <img src="{{ route('users.signature', $purchaseOrder->approver) }}" alt="Signature"
+                                    <img src="{{ route('users.signature', $purchaseOrder->approver, false) }}" alt="Signature"
                                         style="max-width: 80px; max-height: 40px;">
                                 @else
                                     <span class="text-muted text-sm">-</span>

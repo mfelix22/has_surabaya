@@ -1158,7 +1158,7 @@
                     if (prDetailId) formData.append(`items[${index}][purchase_request_detail_id]`, prDetailId.value);
                 });
 
-                fetch('{{ route("purchase_orders.preview") }}', {
+                fetch('{{ route("purchase_orders.preview", [], false) }}', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',

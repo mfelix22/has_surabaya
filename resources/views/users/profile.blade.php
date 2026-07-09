@@ -140,7 +140,7 @@
                         <div class="mb-3">
                             <label class="d-block mb-2"><strong>Current Signature:</strong></label>
                             <div class="border p-3" style="max-width: 400px;">
-                                <img src="{{ route('users.signature', $user) }}?v={{ optional($user->updated_at)->timestamp }}"
+                                <img src="{{ route('users.signature', $user, false) }}?v={{ optional($user->updated_at)->timestamp }}"
                                     alt="User Signature" style="max-width: 100%; max-height: 150px;">
                             </div>
                         </div>

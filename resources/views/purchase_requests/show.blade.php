@@ -19,7 +19,7 @@
                     <div class="card-tools">
                         @if (in_array($purchaseRequest->status, ['completed', 'printed', 'closed']))
                             @if (\App\Helpers\PermissionHelper::canPrint('purchase_requests') || auth()->user()->hasAnyRole(['purchasing']))
-                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print', now()->addMinutes(5), $purchaseRequest) }}"
+                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print', now()->addMinutes(5), $purchaseRequest, false) }}"
                                     class="btn btn-secondary btn-sm" target="_blank">
                                     <i class="fas fa-print"></i> Print
                                 </a>
@@ -189,7 +189,7 @@
                                     <td>{{ $purchaseRequest->requestor->name }}</td>
                                     <td>
                                         @if ($purchaseRequest->requestor->signature_path)
-                                            <img src="{{ route('users.signature', $purchaseRequest->requestor) }}"
+                                            <img src="{{ route('users.signature', $purchaseRequest->requestor, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -211,7 +211,7 @@
                                     </td>
                                     <td>
                                         @if ($purchaseRequest->deptHeadApprover && $purchaseRequest->deptHeadApprover->signature_path)
-                                            <img src="{{ route('users.signature', $purchaseRequest->deptHeadApprover) }}"
+                                            <img src="{{ route('users.signature', $purchaseRequest->deptHeadApprover, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -243,7 +243,7 @@
                                     </td>
                                     <td>
                                         @if ($purchaseRequest->gmApprover && $purchaseRequest->gmApprover->signature_path)
-                                            <img src="{{ route('users.signature', $purchaseRequest->gmApprover) }}"
+                                            <img src="{{ route('users.signature', $purchaseRequest->gmApprover, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -265,7 +265,7 @@
                                     </td>
                                     <td>
                                         @if ($purchaseRequest->purchasingReceiver && $purchaseRequest->purchasingReceiver->signature_path)
-                                            <img src="{{ route('users.signature', $purchaseRequest->purchasingReceiver) }}"
+                                            <img src="{{ route('users.signature', $purchaseRequest->purchasingReceiver, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>

@@ -23,6 +23,7 @@ php artisan config:clear
 php artisan view:clear
 php artisan cache:clear || true
 php artisan migrate --force || true
+rm -rf public/storage
 php artisan storage:link --force || true
 
 exec "$@"

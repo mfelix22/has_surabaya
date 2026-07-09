@@ -527,7 +527,7 @@
     {{-- ===== REAL-TIME NOTIFICATION POLLING ===== --}}
     <script>
         (function() {
-            const POLL_URL = '{{ route('notifications.poll') }}';
+            const POLL_URL = '{{ route('notifications.poll', [], false) }}';
             const POLL_EVERY = 30000; // 30 seconds
             const $badge = $('#notif-badge');
             const $dropdown = $('#notif-dropdown');
