@@ -188,7 +188,7 @@
                                     <td><strong>Created By:</strong></td>
                                     <td>{{ $purchaseRequest->requestor->name }}</td>
                                     <td>
-                                        @if ($purchaseRequest->requestor->signature_path)
+                                        @if ($purchaseRequest->requestor->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->requestor->signature_path))
                                             <img src="{{ route('users.signature', $purchaseRequest->requestor, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
@@ -210,7 +210,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->deptHeadApprover && $purchaseRequest->deptHeadApprover->signature_path)
+                                        @if ($purchaseRequest->deptHeadApprover && $purchaseRequest->deptHeadApprover->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->deptHeadApprover->signature_path))
                                             <img src="{{ route('users.signature', $purchaseRequest->deptHeadApprover, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
@@ -242,7 +242,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->gmApprover && $purchaseRequest->gmApprover->signature_path)
+                                        @if ($purchaseRequest->gmApprover && $purchaseRequest->gmApprover->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->gmApprover->signature_path))
                                             <img src="{{ route('users.signature', $purchaseRequest->gmApprover, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
@@ -264,7 +264,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->purchasingReceiver && $purchaseRequest->purchasingReceiver->signature_path)
+                                        @if ($purchaseRequest->purchasingReceiver && $purchaseRequest->purchasingReceiver->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->purchasingReceiver->signature_path))
                                             <img src="{{ route('users.signature', $purchaseRequest->purchasingReceiver, false) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
