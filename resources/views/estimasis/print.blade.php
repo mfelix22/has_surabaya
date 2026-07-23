@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proforma Invoice {{ $proformaInvoice->proforma_number }}</title>
+    <title>Estimasi {{ $estimasi->estimasi_number }}</title>
     <style>
         * {
             box-sizing: border-box;
@@ -12,12 +12,19 @@
             padding: 0;
         }
 
+        html {
+            background: #ccc;
+        }
+
         body {
             font-family: Arial, sans-serif;
             font-size: 11px;
             color: #000;
             background: #fff;
-            padding: 20px;
+            padding: 24px 32px;
+            max-width: 800px;
+            margin: 20px auto;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
         }
 
         .header-table {
@@ -198,6 +205,11 @@
             margin-bottom: 2px;
         }
 
+        .keterangan p:not(:first-child) {
+            padding-left: 16px;
+            text-indent: -16px;
+        }
+
         .keterangan .highlight {
             font-weight: bold;
             background-color: #ffff00;
@@ -233,15 +245,13 @@
         .sig-label {
             font-weight: bold;
             font-size: 11px;
-            background-color: #ffff00;
             padding: 4px 20px;
-            border: 1px solid #aaa;
             display: inline-block;
         }
 
         .sig-underline {
             width: 80%;
-            margin: 60px auto 4px;
+            margin: 90px auto 4px;
             border-bottom: 1px solid #000;
         }
 
@@ -250,8 +260,15 @@
         }
 
         @media print {
+            html {
+                background: #fff;
+            }
+
             body {
-                padding: 10px;
+                padding: 0;
+                max-width: 100%;
+                margin: 0;
+                box-shadow: none;
             }
 
             .no-print {
@@ -259,7 +276,8 @@
             }
 
             @page {
-                margin: 10mm;
+                size: A4;
+                margin: 12mm 15mm 12mm 15mm;
             }
         }
     </style>
@@ -267,26 +285,14 @@
 
 <body>
     @php
-        $pf = $proformaInvoice;
-        $wo = $pf->workOrder;
+        $wo = $estimasi->workOrder;
 
         $accountLabels = ['C' => 'CASH', 'INT_WS' => 'Internal WS', 'INT_W3' => 'Internal W3'];
         $accountDisplay = $accountLabels[$wo->account_code ?? 'C'] ?? ($wo->account_code ?? '-');
 
         $monthsId = [
-            '',
-            'Januari',
-            'Februari',
-            'Maret',
-            'April',
-            'Mei',
-            'Juni',
-            'Juli',
-            'Agustus',
-            'September',
-            'Oktober',
-            'November',
-            'Desember',
+            '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
         ];
 
         $idDate = function ($date) use ($monthsId) {
@@ -299,40 +305,31 @@
             return $date->day . ' ' . $monthsId[$date->month] . ' ' . $date->year;
         };
 
-        $subtotal = (float) $pf->subtotal;
-        $discountPct = (float) ($pf->discount_percentage ?? 0);
-        $discountAmt = (float) ($pf->discount_amount ?? 0);
-        $grandTotal = (float) $pf->total;
+        $subtotal = (float) $estimasi->subtotal;
+        $discountPercentage = (float) ($estimasi->discount_percentage ?? 0);
+        $discountAmount = $estimasi->status === 'approved' ? (float) ($estimasi->discount_amount ?? 0) : 0;
+        $grandTotal = $estimasi->status === 'approved' ? (float) $estimasi->total : $subtotal;
 
-        // Panel / labor / item breakdown
         $basePanels  = $wo->panelLabors->where('is_extra', false);
         $baseLabors  = $wo->generalLabors->where('is_extra', false);
         $extraLabors = $wo->generalLabors->where('is_extra', true);
-        $extraItems  = $wo->items->where('unit_price', '>', 0);
         $panelTotal = (float) $basePanels->sum('total_price');
         $baseLaborTotal = (float) $baseLabors->sum('total_price');
         $extraLaborTotal = (float) $extraLabors->sum('total_price');
-        $extraItemTotal = (float) $extraItems->sum('total_price');
-
-        // Per-line discount data (target_type 'package' is the panel group line)
-        $hasLines = $pf->discountLines->isNotEmpty();
-        $pkgLines = $pf->discountLines->where('target_type', 'package');
-        $itemLines = $pf->discountLines->where('target_type', 'extra_item');
-        $laborLines = $pf->discountLines->where('target_type', 'extra_labor');
     @endphp
 
-    {{-- PRINT BUTTON --}}
+    {{-- ===== PRINT BUTTON ===== --}}
     <div class="no-print" style="margin-bottom:12px;">
         <button onclick="doPrint()"
             style="padding:6px 16px;font-size:12px;cursor:pointer;background:#007bff;color:#fff;border:none;border-radius:4px;">
             &#128438; Print
         </button>
-        <a href="{{ route('proforma_invoices.show', $proformaInvoice) }}" style="margin-left:10px;font-size:12px;">
+        <a href="{{ route('estimasis.show', $estimasi) }}" style="margin-left:10px;font-size:12px;">
             &larr; Back
         </a>
     </div>
 
-    {{-- HEADER --}}
+    {{-- ===== HEADER ===== --}}
     <table class="header-table">
         <tr>
             <td class="header-logo">
@@ -349,12 +346,12 @@
 
     <hr class="separator">
 
-    <div class="doc-title">PROFORMA INVOICE</div>
-    <div class="doc-number">No : {{ $pf->proforma_number }}</div>
+    <div class="doc-title">ESTIMASI</div>
+    <div class="doc-number">No : {{ $estimasi->estimasi_number }}</div>
 
     <hr class="separator">
 
-    {{-- INFO SECTION --}}
+    {{-- ===== INFO SECTION ===== --}}
     <table class="info-table">
         <tr>
             <td class="info-section">
@@ -402,34 +399,36 @@
                     <tr>
                         <td>Customer Name</td>
                         <td>:</td>
-                        <td class="val">{{ $wo->customer->name ?? '-' }}</td>
+                        <td class="val">{{ optional($wo->customer)->name ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>Address</td>
                         <td>:</td>
-                        <td class="val">{{ $wo->customer->address ?? '-' }}</td>
+                        <td class="val">{{ optional($wo->customer)->address ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>Phone</td>
                         <td>:</td>
-                        <td class="val">{{ $wo->customer->phone ?? '-' }}</td>
+                        <td class="val">{{ optional($wo->customer)->phone ?? '-' }}</td>
                     </tr>
                     <tr>
-                        <td>Proforma Date</td>
+                        <td>Status</td>
                         <td>:</td>
-                        <td class="val">{{ $idDate($pf->created_at) }}</td>
+                        <td class="val">
+                            @php $badge = $estimasi->getStatusBadge(); @endphp
+                            {{ $badge['label'] }}
+                        </td>
                     </tr>
                     <tr>
-                        <td>Created By</td>
+                        <td>Estimasi Date</td>
                         <td>:</td>
-                        <td class="val">{{ $pf->creator->name ?? '-' }}</td>
+                        <td class="val">{{ $idDate($estimasi->created_at) }}</td>
                     </tr>
                 </table>
             </td>
         </tr>
     </table>
 
-    {{-- PANELS TABLE --}}
     <div class="section-label">Panel yang Dikerjakan</div>
     <table class="items-table">
         <thead>
@@ -450,176 +449,100 @@
                     <td class="text-center">{{ number_format($panel->qty, 0) }}</td>
                     <td class="text-right">Rp {{ number_format($panel->rate ?? 0, 0, ',', '.') }}</td>
                     <td class="text-center">
-                        @if ($pkgLines->isNotEmpty())
-                            @foreach ($pkgLines as $line)
-                                @if ($line->status === 'approved')
-                                    {{ number_format($line->discount_percentage, 2) }}%
-                                @elseif ($line->status === 'rejected')
-                                    <em>No disc.</em>
-                                @else
-                                    Pending
-                                @endif
-                            @endforeach
-                        @else
-                            -
-                        @endif
+                        {{ $discountAmount > 0 ? number_format($discountPercentage, 1) . '%' : '-' }}
                     </td>
                     <td class="text-right">Rp {{ number_format($panel->total_price ?? 0, 0, ',', '.') }}</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center" style="color:#999;">—</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center" style="color:#999;">—</td>
+                </tr>
             @endforelse
             @for ($i = $basePanels->count(); $i < 3; $i++)
-                <tr class="empty-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr class="empty-row">
+                    <td>&nbsp;</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
             @endfor
         </tbody>
     </table>
 
-    {{-- BASE LABOR TABLE --}}
     @if ($baseLabors->isNotEmpty())
-    <div class="section-label">Labor yang Dikerjakan</div>
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width:12%">Labor Code</th>
-                <th style="width:38%">Labor</th>
-                <th style="width:8%" class="text-center">Qty</th>
-                <th style="width:18%">Rate</th>
-                <th style="width:10%">Discount</th>
-                <th style="width:14%">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($baseLabors as $labor)
+        <div class="section-label">Labor yang Dikerjakan</div>
+        <table class="items-table">
+            <thead>
                 <tr>
-                    <td>{{ $labor->labor?->labor_code ?? '-' }}</td>
-                    <td>{{ $labor->description }}</td>
-                    <td class="text-center">{{ number_format($labor->qty, 0) }}</td>
-                    <td class="text-right">Rp {{ number_format($labor->rate ?? 0, 0, ',', '.') }}</td>
-                    <td class="text-center">-</td>
-                    <td class="text-right">Rp {{ number_format($labor->total_price ?? 0, 0, ',', '.') }}</td>
+                    <th style="width:12%">Labor Code</th>
+                    <th style="width:38%">Labor</th>
+                    <th style="width:8%" class="text-center">Qty</th>
+                    <th style="width:18%">Rate</th>
+                    <th style="width:10%">Discount</th>
+                    <th style="width:14%">Total</th>
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
-    @endif
-
-    {{-- EXTRA LABOR TABLE --}}
-    @if ($extraLabors->isNotEmpty() || $laborLines->isNotEmpty())
-    <div class="section-label">Extra Labor</div>
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width:12%">Labor Code</th>
-                <th style="width:38%">Extra Labor</th>
-                <th style="width:8%" class="text-center">Qty</th>
-                <th style="width:18%">Rate</th>
-                <th style="width:10%">Discount</th>
-                <th style="width:14%">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($extraLabors as $labor)
-                <tr>
-                    <td>{{ $labor->labor?->labor_code ?? 'LAB' }}</td>
-                    <td>{{ $labor->description }}</td>
-                    <td class="text-center">{{ number_format($labor->qty, 0) }}</td>
-                    <td class="text-right">Rp {{ number_format($labor->rate ?? 0, 0, ',', '.') }}</td>
-                    <td class="text-center">-</td>
-                    <td class="text-right">Rp {{ number_format($labor->total_price ?? 0, 0, ',', '.') }}</td>
-                </tr>
-            @endforeach
-            @if ($hasLines)
-                @foreach ($laborLines as $line)
+            </thead>
+            <tbody>
+                @foreach ($baseLabors as $labor)
                     <tr>
-                        <td>LAB</td>
-                        <td>{{ $line->description }}</td>
-                        <td class="text-center">1</td>
-                        <td class="text-right">Rp {{ number_format($line->original_price, 0, ',', '.') }}</td>
-                        <td class="text-center">
-                            @if ($line->status === 'approved')
-                                {{ number_format($line->discount_percentage, 2) }}%
-                            @elseif ($line->status === 'rejected')
-                                <em>No disc.</em>
-                            @else
-                                Pending
-                            @endif
-                        </td>
-                        <td class="text-right">Rp {{ number_format($line->final_price, 0, ',', '.') }}</td>
+                        <td>{{ $labor->labor?->labor_code ?? '-' }}</td>
+                        <td>{{ $labor->description }}</td>
+                        <td class="text-center">{{ number_format($labor->qty, 0) }}</td>
+                        <td class="text-right">Rp {{ number_format($labor->rate ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-center">-</td>
+                        <td class="text-right">Rp {{ number_format($labor->total_price ?? 0, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
-            @endif
-        </tbody>
-    </table>
+            </tbody>
+        </table>
     @endif
 
-    {{-- EXTRA ITEMS TABLE --}}
-    @if ($extraItems->isNotEmpty() || $itemLines->isNotEmpty())
-    <div class="section-label">Extra Materials</div>
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width:12%">Item Code</th>
-                <th style="width:38%">Description</th>
-                <th style="width:8%" class="text-center">Qty</th>
-                <th style="width:18%">Price</th>
-                <th style="width:10%">Discount</th>
-                <th style="width:14%">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($extraItems as $item)
+    @if ($extraLabors->isNotEmpty())
+        <div class="section-label">Extra Labor</div>
+        <table class="items-table">
+            <thead>
                 <tr>
-                    <td>{{ $item->item?->code ?? '-' }}</td>
-                    <td>{{ optional($item->item)->name ?? $item->description ?? '-' }}</td>
-                    <td class="text-center">{{ number_format($item->actual_quantity ?? ($item->demand_quantity ?? 0), 2) }}</td>
-                    <td class="text-right">Rp {{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                    <td class="text-center">-</td>
-                    <td class="text-right">Rp {{ number_format($item->total_price, 0, ',', '.') }}</td>
+                    <th style="width:12%">Labor Code</th>
+                    <th style="width:38%">Extra Labor</th>
+                    <th style="width:8%" class="text-center">Qty</th>
+                    <th style="width:18%">Rate</th>
+                    <th style="width:10%">Discount</th>
+                    <th style="width:14%">Total</th>
                 </tr>
-            @endforeach
-            @if ($hasLines)
-                @foreach ($itemLines as $line)
-                    @php
-                        $parts = explode(' — ', $line->description, 2);
-                        $itemCode = count($parts) === 2 ? $parts[0] : '—';
-                        $itemDesc = count($parts) === 2 ? $parts[1] : $line->description;
-                    @endphp
+            </thead>
+            <tbody>
+                @foreach ($extraLabors as $labor)
                     <tr>
-                        <td>{{ $itemCode }}</td>
-                        <td>{{ $itemDesc }}</td>
-                        <td class="text-center">1</td>
-                        <td class="text-right">Rp {{ number_format($line->original_price, 0, ',', '.') }}</td>
-                        <td class="text-center">
-                            @if ($line->status === 'approved')
-                                {{ number_format($line->discount_percentage, 2) }}%
-                            @elseif ($line->status === 'rejected')
-                                <em>No disc.</em>
-                            @else
-                                Pending
-                            @endif
-                        </td>
-                        <td class="text-right">Rp {{ number_format($line->final_price, 0, ',', '.') }}</td>
+                        <td>{{ $labor->labor?->labor_code ?? 'LAB' }}</td>
+                        <td>{{ $labor->description }}</td>
+                        <td class="text-center">{{ number_format($labor->qty, 0) }}</td>
+                        <td class="text-right">Rp {{ number_format($labor->rate ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-center">-</td>
+                        <td class="text-right">Rp {{ number_format($labor->total_price ?? 0, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
-            @endif
-        </tbody>
-    </table>
+            </tbody>
+        </table>
     @endif
 
-    {{-- BOTTOM: PAYMENT + TOTALS --}}
+    @if ($estimasi->notes)
+        <div style="margin-top:10px; font-size:11px; line-height:1.5;">
+            <strong>Notes :</strong><br>
+            {{ $estimasi->notes }}
+        </div>
+    @endif
+
+    {{-- ===== BOTTOM: PAYMENT + TOTALS ===== --}}
     <table class="bottom-section">
         <tr>
             <td style="width:55%;">
                 <div class="payment-info">
-                    @if (($wo->account_code ?? 'C') === 'C')
-                        <strong>Pembayaran Tunai</strong>
-                    @else
-                        <strong>Pembayaran Non Tunai :</strong>
-                    @endif
+                    <strong>Pembayaran Melalui</strong>
                     <br>
-                    Rekening BCA : <strong>088 880 5080</strong><br>
-                    a.n <strong>Hartono Auto Studio</strong>
+                    Rekening BCA : <strong>088 869 5080</strong><br>
+                    a.n <strong>PT Hartono Auto Studio</strong>
                 </div>
             </td>
             <td style="width:45%;">
@@ -628,36 +551,30 @@
                         <td style="width:45%"><strong>Total Panel</strong></td>
                         <td class="text-right">Rp {{ number_format($panelTotal, 0, ',', '.') }}</td>
                     </tr>
+                    @if ($baseLaborTotal > 0)
+                        <tr>
+                            <td><strong>Total Labor</strong></td>
+                            <td class="text-right">Rp {{ number_format($baseLaborTotal, 0, ',', '.') }}</td>
+                        </tr>
+                    @endif
                     @if ($extraLaborTotal > 0)
                         <tr>
                             <td><strong>Total Extra Labor</strong></td>
                             <td class="text-right">Rp {{ number_format($extraLaborTotal, 0, ',', '.') }}</td>
                         </tr>
                     @endif
-                    @if ($extraItemTotal > 0)
-                        <tr>
-                            <td><strong>Total Extra Materials</strong></td>
-                            <td class="text-right">Rp {{ number_format($extraItemTotal, 0, ',', '.') }}</td>
-                        </tr>
-                    @endif
                     <tr>
                         <td><strong>Subtotal</strong></td>
                         <td class="text-right">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
                     </tr>
-                    @if ($discountAmt > 0)
+                    @if ($discountAmount > 0)
                         <tr>
-                            <td><strong>Discount ({{ number_format($discountPct, 2) }}%)</strong></td>
-                            <td class="text-right">- Rp {{ number_format($discountAmt, 0, ',', '.') }}</td>
-                        </tr>
-                    @endif
-                    @if ((float) $pf->voucher_amount > 0)
-                        <tr>
-                            <td><strong>Voucher
-                                    @if ($pf->voucher_code)
-                                        ({{ $pf->voucher_code }})
-                                    @endif
-                                </strong></td>
-                            <td class="text-right">- Rp {{ number_format($pf->voucher_amount, 0, ',', '.') }}</td>
+                            <td>
+                                <strong>Discount</strong>
+                                <small class="text-muted">({{ number_format($discountPercentage, 2) }}%)</small>
+                            </td>
+                            <td class="text-right" style="color:#c00;">
+                                — Rp {{ number_format($discountAmount, 0, ',', '.') }}</td>
                         </tr>
                     @endif
                     <tr class="grand-total">
@@ -669,26 +586,23 @@
         </tr>
     </table>
 
-    {{-- KETERANGAN --}}
+    {{-- ===== KETERANGAN ===== --}}
     <div class="keterangan">
         <p><strong>Keterangan :</strong></p>
-        <p>1. Dokumen ini adalah Proforma Invoice dan bukan merupakan tagihan resmi. Invoice resmi akan diterbitkan
-            setelah konfirmasi dari pihak terkait.</p>
-        <p>2. Harga yang tercantum bersifat estimasi dan dapat berubah sesuai kondisi aktual kendaraan.</p>
-        <p>3. <span class="highlight">Perawatan kendaraan yang dikerjakan di PT Hartono Auto Studio disarankan setiap 6
-                bulan sekali.</span></p>
-        <p>4. PT Hartono Auto Studio tidak bertanggung jawab atas kondisi kendaraan yang telah selesai dikerjakan akan
-            tetapi tidak diambil dalam kurun waktu 1 minggu dari tanggal diinformasikannya customer.</p>
-        <p>5. Barang yang sudah dibeli tidak dapat dikembalikan kecuali dengan perjanjian.</p>
+        <p>1. Dokumen ini adalah Estimasi biaya perbaikan dan <span class="highlight">bukan merupakan Invoice /
+                Tagihan resmi</span>. Nilai final dapat berubah menyesuaikan kondisi kendaraan pada saat pengerjaan.</p>
+        <p>2. Estimasi ini dapat digunakan sebagai dasar pengajuan klaim ke pihak Asuransi.</p>
+        <p>3. Estimasi berlaku 14 (empat belas) hari kalender sejak tanggal diterbitkan.</p>
     </div>
 
-    {{-- SIGNATURE + COMPANY FOOTER --}}
+    {{-- ===== SIGNATURE + COMPANY FOOTER ===== --}}
     <table class="sig-footer-table">
         <tr>
             <td style="width:55%;">
                 <div class="company-footer">
                     <strong>PT Hartono Auto Studio</strong><br>
                     Jl. Demak No. 166 - 168, Gundih, Kec. Bubutan, Surabaya, Jawa Timur, 60172<br>
+                    Jam Buka: Senin-Jumat 08:00-17:00 Sabtu 08:00-13:00<br>
                     <a href="mailto:hrautostudio@hartonomotor.com">hrautostudio@hartonomotor.com</a><br>
                     +62 877 2095 5959
                 </div>
@@ -712,9 +626,9 @@
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({
-                    model_type: 'ProformaInvoice',
-                    model_id: {{ $proformaInvoice->id }},
-                    document_number: '{{ $proformaInvoice->proforma_number }}'
+                    model_type: 'Estimasi',
+                    model_id: {{ $estimasi->id }},
+                    document_number: '{{ $estimasi->estimasi_number }}'
                 })
             }).finally(function() {
                 window.print();

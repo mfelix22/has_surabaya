@@ -120,6 +120,7 @@
                                 'packages.*',
                                 'vehicles.*',
                                 'labors.*',
+                                'panels.*',
                             ];
                             $mdOpen = request()->routeIs($mdRoutes);
                             $mdVisible =
@@ -129,7 +130,8 @@
                                 \App\Helpers\PermissionHelper::canView('suppliers') ||
                                 \App\Helpers\PermissionHelper::canView('packages') ||
                                 \App\Helpers\PermissionHelper::canView('vehicles') ||
-                                \App\Helpers\PermissionHelper::canView('labors');
+                                \App\Helpers\PermissionHelper::canView('labors') ||
+                                \App\Helpers\PermissionHelper::canView('panels');
                         @endphp
                         @if ($mdVisible)
                             <li class="nav-item has-treeview {{ $mdOpen ? 'menu-open' : '' }}">
@@ -183,11 +185,20 @@
                                             </a>
                                         </li>
                                     @endif
+                                    @if (\App\Helpers\PermissionHelper::canView('panels'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('panels.index') }}"
+                                                class="nav-link {{ request()->routeIs('panels.*') ? 'active' : '' }}">
+                                                <i class="fas fa-brush nav-icon"></i>
+                                                <p>Panels</p>
+                                            </a>
+                                        </li>
+                                    @endif
                                     @if (\App\Helpers\PermissionHelper::canView('labors'))
                                         <li class="nav-item">
                                             <a href="{{ route('labors.index') }}"
                                                 class="nav-link {{ request()->routeIs('labors.*') ? 'active' : '' }}">
-                                                <i class="fas fa-brush nav-icon"></i>
+                                                <i class="fas fa-wrench nav-icon"></i>
                                                 <p>Labor</p>
                                             </a>
                                         </li>
@@ -298,6 +309,7 @@
                                 'invoices.*',
                                 'credit_notes.*',
                                 'proforma_invoices.*',
+                                'estimasis.*',
                             ];
                             $opsOpen = request()->routeIs($opsRoutes);
                             $opsVisible =
@@ -306,6 +318,7 @@
                                 \App\Helpers\PermissionHelper::canView('bon_outs') ||
                                 \App\Helpers\PermissionHelper::canView('invoices') ||
                                 \App\Helpers\PermissionHelper::canView('proforma_invoices') ||
+                                \App\Helpers\PermissionHelper::canView('estimasis') ||
                                 auth()
                                     ->user()
                                     ->hasAnyRole([
@@ -361,6 +374,15 @@
                                             </a>
                                         </li>
                                     @endif
+                                    @if (\App\Helpers\PermissionHelper::canView('estimasis'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('estimasis.index') }}"
+                                                class="nav-link {{ request()->routeIs('estimasis.*') ? 'active' : '' }}">
+                                                <i class="fas fa-file-invoice nav-icon"></i>
+                                                <p>Estimasi</p>
+                                            </a>
+                                        </li>
+                                    @endif
                                     @if (\App\Helpers\PermissionHelper::canView('invoices'))
                                         <li class="nav-item">
                                             <a href="{{ route('invoices.index') }}"
@@ -392,7 +414,7 @@
                             <li class="nav-item has-treeview {{ $acctOpen ? 'menu-open' : '' }}">
                                 <a href="#" class="nav-link {{ $acctOpen ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-chart-line"></i>
-                                    <p>Accounting <i class="right fas fa-angle-left"></i></p>
+                                    <p>Audit <i class="right fas fa-angle-left"></i></p>
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
@@ -527,7 +549,7 @@
     {{-- ===== REAL-TIME NOTIFICATION POLLING ===== --}}
     <script>
         (function() {
-            const POLL_URL = '{{ route('notifications.poll', [], false) }}';
+            const POLL_URL = '{{ route('notifications.poll') }}';
             const POLL_EVERY = 30000; // 30 seconds
             const $badge = $('#notif-badge');
             const $dropdown = $('#notif-dropdown');

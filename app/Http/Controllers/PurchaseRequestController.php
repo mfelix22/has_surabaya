@@ -230,7 +230,7 @@ class PurchaseRequestController extends Controller
             'gmApprover',
             'details.item',
             'details.uom',
-            'purchaseOrders'
+            'purchaseOrders.beritaAcaraUploader'
         ]);
         return view('purchase_requests.show', compact('purchaseRequest'));
     }

@@ -17,11 +17,13 @@ use App\Http\Controllers\ReceivableController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WorkOrderController;
 use App\Http\Controllers\LaborController;
+use App\Http\Controllers\PanelController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\BonOutController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProformaInvoiceController;
+use App\Http\Controllers\EstimasiController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CreditNoteController;
@@ -137,6 +139,7 @@ Route::middleware('auth')->group(function () {
         Route::post('purchase-requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject'])->name('purchase_requests.reject');
         Route::post('purchase-requests/{purchaseRequest}/cancel', [PurchaseRequestController::class, 'cancel'])->name('purchase_requests.cancel');
         Route::post('purchase-requests/{purchaseRequest}/close', [PurchaseRequestController::class, 'close'])->name('purchase_requests.close');
+        Route::post('purchase-requests/{purchaseRequest}/upload-berita-acara', [PurchaseRequestController::class, 'uploadBeritaAcara'])->name('purchase_requests.upload_berita_acara');
         Route::get('purchase-requests/{purchaseRequest}/print', [PurchaseRequestController::class, 'print'])->name('purchase_requests.print')->middleware('signed');
         Route::get('purchase-requests/{purchaseRequest}/attachment', [PurchaseRequestController::class, 'attachment'])->name('purchase_requests.attachment');
     });
@@ -145,7 +148,6 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase-orders/export-excel', [PurchaseOrderController::class, 'exportExcel'])->name('purchase_orders.export_excel');
     Route::post('purchase-orders/preview', [PurchaseOrderController::class, 'preview'])->name('purchase_orders.preview');
     Route::resource('purchase-orders', PurchaseOrderController::class)->names('purchase_orders');
-    Route::get('purchase-orders/{purchaseOrder}/preview', [PurchaseOrderController::class, 'printPreview'])->name('purchase_orders.print_preview');
     Route::post('purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase_orders.approve');
     Route::post('purchase-orders/{purchaseOrder}/revoke-approval', [PurchaseOrderController::class, 'revokeApproval'])->name('purchase_orders.revoke_approval');
     Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase_orders.receive');
@@ -153,7 +155,9 @@ Route::middleware('auth')->group(function () {
     Route::post('purchase-orders/{purchaseOrder}/record-invoice', [PurchaseOrderController::class, 'recordInvoice'])->name('purchase_orders.record_invoice');
     Route::post('purchase-orders/{purchaseOrder}/complete', [PurchaseOrderController::class, 'complete'])->name('purchase_orders.complete');
     Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase_orders.cancel');
+    Route::post('purchase-orders/{purchaseOrder}/close-so', [PurchaseOrderController::class, 'closeSO'])->name('purchase_orders.close_so');
     Route::get('purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase_orders.print')->middleware('signed');
+    Route::get('purchase-orders/{purchaseOrder}/print-preview', [PurchaseOrderController::class, 'printPreview'])->name('purchase_orders.print_preview');
 
     // Vendor Comparisons (FK-PCH)
     Route::resource('vendor-comparisons', VendorComparisonController::class)->names('vendor_comparisons');
@@ -192,6 +196,11 @@ Route::middleware('auth')->group(function () {
     Route::post('labors/import', [LaborController::class, 'import'])->name('labors.import');
     Route::resource('labors', LaborController::class)->except(['show']);
 
+    // Panel Master
+    Route::get('panels/template', [PanelController::class, 'downloadTemplate'])->name('panels.template');
+    Route::post('panels/import', [PanelController::class, 'import'])->name('panels.import');
+    Route::resource('panels', PanelController::class)->except(['show']);
+
     // Invoices
     Route::resource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid'])->name('invoices.markAsPaid');
@@ -222,6 +231,12 @@ Route::middleware('auth')->group(function () {
     Route::get('proforma-invoices/{proformaInvoice}/print', [ProformaInvoiceController::class, 'print'])->name('proforma_invoices.print')->middleware('signed');
     Route::post('proforma-invoices/{proformaInvoice}/lines/{line}/approve', [ProformaInvoiceController::class, 'approveLine'])->name('proforma_invoices.approve_line');
     Route::post('proforma-invoices/{proformaInvoice}/lines/{line}/reject', [ProformaInvoiceController::class, 'rejectLine'])->name('proforma_invoices.reject_line');
+
+    // Estimasi
+    Route::resource('estimasis', EstimasiController::class)->except(['edit', 'update', 'destroy']);
+    Route::post('estimasis/{estimasi}/approve', [EstimasiController::class, 'approve'])->name('estimasis.approve');
+    Route::post('estimasis/{estimasi}/reject', [EstimasiController::class, 'reject'])->name('estimasis.reject');
+    Route::get('estimasis/{estimasi}/print', [EstimasiController::class, 'print'])->name('estimasis.print')->middleware('signed');
 
 
     // Stock Management (Purchasing role has no access)

@@ -33,14 +33,6 @@
                             </div>
                         @endif
 
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Multi-Day Work Support:</strong> Enter materials used <strong>today</strong> only. Leave
-                            quantity as 0 for materials not used today.
-                            You can create another Bon Out tomorrow for the next day's usage.
-                            Items with zero quantity will be ignored.
-                        </div>
-
                         {{-- WO Summary --}}
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -54,9 +46,14 @@
                                         <td>{{ $workOrder->customer->name }}</td>
                                     </tr>
                                     <tr>
-                                        <th>Package</th>
-                                        <td>{{ $workOrder->paket_name ?? '-' }}
-                                            {{ $workOrder->paket_size ? "({$workOrder->paket_size})" : '' }}</td>
+                                        <th>Panels</th>
+                                        <td>
+                                            @forelse ($workOrder->panelLabors->where('is_extra', false) as $wl)
+                                                <span class="badge badge-secondary">{{ $wl->panel?->panel_code ?? $wl->description }}</span>
+                                            @empty
+                                                -
+                                            @endforelse
+                                        </td>
                                     </tr>
                                     <tr>
                                         <th>Vehicle</th>
@@ -81,98 +78,40 @@
                             </div>
                         </div>
 
-                        {{-- Materials Table --}}
-                        <h5><i class="fas fa-boxes"></i> Material Usage (From Work Order)</h5>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover" id="woMaterialsTable">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th width="40">#</th>
-                                        <th>Item</th>
-                                        <th class="text-right" width="120">Planned</th>
-                                        <th class="text-right" width="120">Already Used</th>
-                                        <th class="text-right" width="120">Available Stock</th>
-                                        <th class="text-center" width="180">Qty Used Today</th>
-                                        <th width="180">Remark</th>
-                                        <th class="text-center" width="100">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($workOrder->items as $idx => $woItem)
-                                        @php
-                                            $uomCode = $woItem->item->smallestUom->code ?? '-';
-                                            $availableStock = $woItem->item->stocks->sum('quantity');
-                                            $alreadyUsed = $woItem->actual_quantity ?? 0;
-                                        @endphp
-                                        <input type="hidden" name="items[{{ $idx }}][item_id]"
-                                            value="{{ $woItem->item_id }}">
-                                        <input type="hidden" name="items[{{ $idx }}][work_order_item_id]"
-                                            value="{{ $woItem->id }}">
-                                        <tr class="material-row">
-                                            <td>{{ $idx + 1 }}</td>
-                                            <td>
-                                                <strong>[{{ $woItem->item->code }}]</strong> {{ $woItem->item->name }}
-                                                @if ($woItem->remark)
-                                                    <br><small class="text-muted">{{ $woItem->remark }}</small>
-                                                @endif
-                                            </td>
-                                            <td class="text-right">
-                                                {{ number_format($woItem->demand_quantity, 2) }} {{ $uomCode }}
-                                            </td>
-                                            <td class="text-right">
-                                                {{ number_format($alreadyUsed, 2) }} {{ $uomCode }}
-                                            </td>
-                                            <td class="text-right">
-                                                <span class="{{ $availableStock > 0 ? 'text-success' : 'text-danger' }}">
-                                                    {{ number_format($availableStock, 2) }} {{ $uomCode }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="input-group input-group-sm">
-                                                    <input type="number"
-                                                        name="items[{{ $idx }}][actual_quantity]"
-                                                        class="form-control qty-input text-right" step="0.01"
-                                                        min="0" max="{{ $availableStock }}"
-                                                        value="{{ old("items.{$idx}.actual_quantity", 0) }}"
-                                                        data-available="{{ $availableStock }}"
-                                                        data-uom="{{ $uomCode }}">
-                                                    <div class="input-group-append">
-                                                        <span class="input-group-text">{{ $uomCode }}</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <input type="text" name="items[{{ $idx }}][remark]"
-                                                    class="form-control form-control-sm" placeholder="Optional remark...">
-                                            </td>
-                                            <td class="text-center status-cell">
-                                                <span class="badge badge-secondary">Not used</span>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="8" class="text-center text-muted">No materials in Work Order
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                        {{-- Section-based Materials --}}
+                        @php
+                            $sections = [
+                                'A' => 'DEMPUL',
+                                'B' => 'CAT',
+                                'C' => 'VERNIS',
+                                'D' => 'POLES dan KEBERSIHAN AKHIR',
+                                'E' => 'SPAREPART',
+                            ];
+                        @endphp
 
-                        {{-- Add Other Materials Section --}}
-                        <div class="mt-4">
-                            <h5><i class="fas fa-plus-circle"></i> Add Other Materials (Not in Work Order)</h5>
-                            <div class="alert alert-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                Use this section if you need materials that weren't originally planned in the Work Order.
+                        @foreach ($sections as $sectionKey => $sectionLabel)
+                        <div class="card mb-3 section-card" id="section-card-{{ $sectionKey }}">
+                            <div class="card-header py-2" style="background:{{ $sectionKey === 'E' ? '#fff3cd' : '#f8f9fa' }};">
+                                <strong>{{ $sectionKey }}. &nbsp; {{ $sectionLabel }}</strong>
+                                @if ($sectionKey === 'E')
+                                    <small class="text-muted ml-2">— Sparepart used to replace parts (e.g. bumper). Always billed to the customer.</small>
+                                @endif
+                                <button type="button" class="btn btn-success btn-xs float-right add-section-btn"
+                                    data-section="{{ $sectionKey }}">
+                                    <i class="fas fa-plus"></i> Add Material
+                                </button>
                             </div>
-
-                            <div id="newMaterialsContainer"></div>
-
-                            <button type="button" class="btn btn-sm btn-success" id="addNewMaterialBtn">
-                                <i class="fas fa-plus"></i> Add Material
-                            </button>
+                            <div class="card-body p-2">
+                                <div class="section-items-container" id="section-items-{{ $sectionKey }}">
+                                    <p class="text-muted text-center small py-2 empty-section-msg">No materials added yet.</p>
+                                </div>
+                                <div class="d-flex justify-content-end mt-1">
+                                    <span class="text-muted small mr-2">Subtotal Section {{ $sectionKey }}:</span>
+                                    <strong class="section-subtotal" id="subtotal-{{ $sectionKey }}">Rp 0</strong>
+                                </div>
+                            </div>
                         </div>
+                        @endforeach
                     </div>
 
                     <div class="card-footer">
@@ -190,61 +129,59 @@
         </div>
     </div>
 
-    {{-- Hidden template for new material row --}}
-    <template id="newMaterialTemplate">
-        <div class="card mb-2 new-material-item">
-            <div class="card-body p-3">
-                <div class="row mb-2">
-                    <div class="col-md-11">
-                        <label>Material <span class="text-danger">*</span></label>
-                        <select class="form-control form-control-sm select2-new-material material-select"
-                            data-index="__INDEX__" required>
-                            <option value="">-- Select Material --</option>
-                            @foreach ($allItems as $item)
-                                <option value="{{ $item->id }}" data-code="{{ $item->code }}"
-                                    data-name="{{ $item->name }}" data-uom="{{ $item->smallestUom->code ?? '-' }}"
-                                    data-stock="{{ $item->stocks->sum('quantity') }}">
-                                    [{{ $item->code }}] {{ $item->name }} (Stock:
-                                    {{ number_format($item->stocks->sum('quantity'), 2) }}
-                                    {{ $item->smallestUom->code ?? '-' }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-1">
-                        <label>&nbsp;</label>
-                        <button type="button" class="btn btn-sm btn-danger btn-block remove-material-btn">
-                            <i class="fas fa-trash"></i>
-                        </button>
+    {{-- Hidden item row template --}}
+    <template id="materialRowTemplate">
+        <div class="border rounded p-2 mb-2 material-row bg-white">
+            <input type="hidden" name="items[__INDEX__][bon_out_section]" value="__SECTION__">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="small mb-1">Material <span class="text-danger">*</span></label>
+                    <select class="form-control form-control-sm select2-material material-select"
+                        name="items[__INDEX__][item_id]" data-index="__INDEX__" required>
+                        <option value="">-- Select Material --</option>
+                        @foreach ($allItems as $item)
+                            <option value="{{ $item->id }}"
+                                data-type="{{ $item->item_type }}"
+                                data-uom="{{ $item->smallestUom->code ?? '-' }}"
+                                data-stock="{{ $item->stocks->sum('quantity') }}">
+                                [{{ $item->code }}] {{ $item->name }}
+                                (Stock: {{ number_format($item->stocks->sum('quantity'), 2) }} {{ $item->smallestUom->code ?? '-' }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="small mb-1">Stock Available</label>
+                    <input type="text" class="form-control form-control-sm stock-display" readonly value="-">
+                </div>
+                <div class="col-md-2">
+                    <label class="small mb-1">Qty Used <span class="text-danger">*</span></label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control qty-input"
+                            name="items[__INDEX__][actual_quantity]" step="0.01" min="0.01" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text uom-label">-</span>
+                        </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <label>Available Stock</label>
-                        <input type="text" class="form-control form-control-sm available-stock-display" readonly
-                            value="-">
+                <div class="col-md-2">
+                    <label class="small mb-1 price-label">Selling Price <small class="text-muted price-optional-hint">(optional)</small></label>
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend"><span class="input-group-text">Rp</span></div>
+                        <input type="number" class="form-control price-input"
+                            name="items[__INDEX__][unit_price]" step="1" min="0" placeholder="0">
                     </div>
-                    <div class="col-md-4">
-                        <label>Quantity <span class="text-danger">*</span></label>
-                        <div class="input-group input-group-sm">
-                            <input type="number" class="form-control new-qty-input" step="0.01" min="0.01"
-                                value="" data-index="__INDEX__" data-field="actual_quantity" required>
-                            <div class="input-group-append">
-                                <span class="input-group-text uom-display">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <label>Selling Price (Rp) <small class="text-muted">optional</small></label>
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend"><span class="input-group-text">Rp</span></div>
-                            <input type="number" name="items[__INDEX__][unit_price]" data-index="__INDEX__"
-                                data-field="unit_price" class="form-control new-price-input" step="1"
-                                min="0" value="" placeholder="0 = internal use only">
-                        </div>
-                        <small class="text-info"><i class="fas fa-info-circle"></i> If set, item is billed to
-                            customer</small>
-                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="small mb-1">Remark</label>
+                    <input type="text" class="form-control form-control-sm"
+                        name="items[__INDEX__][remark]" placeholder="e.g. RQ No">
+                </div>
+                <div class="col-md-1 text-right">
+                    <label class="small mb-1">&nbsp;</label>
+                    <button type="button" class="btn btn-sm btn-danger btn-block remove-row-btn">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -253,126 +190,107 @@
 
 @section('scripts')
     <script>
-        let newMaterialIndex = {{ count($workOrder->items) }};
+        let materialIndex = 0;
 
-        // Update status badge based on quantity
-        document.querySelectorAll('.qty-input').forEach(function(input) {
-            const row = input.closest('tr');
-            const statusCell = row.querySelector('.status-cell');
-            const available = parseFloat(input.dataset.available) || 0;
+        const fmtRp = v => 'Rp ' + parseFloat(v || 0).toLocaleString('id-ID');
 
-            function updateStatus() {
-                const qty = parseFloat(input.value) || 0;
-
-                if (qty > 0) {
-                    if (qty > available) {
-                        statusCell.innerHTML = '<span class="badge badge-danger">⚠ Insufficient stock!</span>';
-                        input.classList.add('is-invalid');
-                    } else {
-                        statusCell.innerHTML = '<span class="badge badge-success">✓ Will be saved</span>';
-                        input.classList.remove('is-invalid');
-                    }
-                } else {
-                    statusCell.innerHTML = '<span class="badge badge-secondary">Not used</span>';
-                    input.classList.remove('is-invalid');
-                }
-
-                updateItemCount();
-            }
-
-            input.addEventListener('input', updateStatus);
-            updateStatus();
-        });
-
-        // Count items with qty > 0
-        function updateItemCount() {
-            let count = 0;
-
-            // Count WO materials
-            document.querySelectorAll('.qty-input').forEach(input => {
-                if (parseFloat(input.value) > 0) count++;
+        function updateSectionSubtotal(section) {
+            let total = 0;
+            document.querySelectorAll(`#section-items-${section} .material-row`).forEach(row => {
+                const qty   = parseFloat(row.querySelector('.qty-input')?.value   || 0);
+                const price = parseFloat(row.querySelector('.price-input')?.value || 0);
+                total += qty * price;
             });
+            document.getElementById(`subtotal-${section}`).textContent = fmtRp(total);
+        }
 
-            // Count new materials
-            document.querySelectorAll('.new-material-item').forEach(() => count++);
-
+        function updateItemCount() {
+            const count = document.querySelectorAll('.material-row').length;
             document.getElementById('itemCount').textContent = count;
         }
 
-        // Add new material button
-        document.getElementById('addNewMaterialBtn').addEventListener('click', function() {
-            const template = document.getElementById('newMaterialTemplate');
-            const clone = template.content.cloneNode(true);
+        function addMaterialRow(section) {
+            const template = document.getElementById('materialRowTemplate');
+            const html = template.innerHTML
+                .replace(/__INDEX__/g, materialIndex)
+                .replace(/__SECTION__/g, section);
 
-            // Replace __INDEX__ with actual index
-            clone.querySelectorAll('[data-index="__INDEX__"]').forEach(el => {
-                el.setAttribute('data-index', newMaterialIndex);
-                if (el.tagName === 'SELECT') {
-                    el.setAttribute('name', `items[${newMaterialIndex}][item_id]`);
-                    el.classList.remove('select2-new-material');
-                    el.classList.add('select2-material-' + newMaterialIndex);
-                } else if (el.tagName === 'INPUT') {
-                    const field = el.dataset.field || 'actual_quantity';
-                    el.setAttribute('name', `items[${newMaterialIndex}][${field}]`);
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            const row = wrapper.firstElementChild;
+
+            const container = document.getElementById(`section-items-${section}`);
+            // Hide empty message
+            const emptyMsg = container.querySelector('.empty-section-msg');
+            if (emptyMsg) emptyMsg.style.display = 'none';
+
+            // Section E (Sparepart) — restrict material options to Sparepart items only,
+            // and require a selling price since these are always billed to the customer.
+            if (section === 'E') {
+                row.querySelectorAll('.material-select option').forEach(opt => {
+                    if (opt.value !== '' && opt.dataset.type !== 'SP') {
+                        opt.remove();
+                    }
+                });
+                const priceInput = row.querySelector('.price-input');
+                priceInput.setAttribute('required', 'required');
+                priceInput.setAttribute('min', '1');
+                const hint = row.querySelector('.price-optional-hint');
+                if (hint) hint.textContent = '(required — billed to customer)';
+                const priceLabel = row.querySelector('.price-label');
+                if (priceLabel) {
+                    const star = document.createElement('span');
+                    star.className = 'text-danger';
+                    star.textContent = ' *';
+                    priceLabel.appendChild(star);
                 }
+            }
+
+            container.appendChild(row);
+
+            // Init Select2
+            const $sel = $(row).find('.select2-material');
+            $sel.select2({ theme: 'bootstrap4', width: '100%' });
+            $sel.on('select2:select', function(e) {
+                const opt = e.params.data.element;
+                const uom   = opt?.dataset?.uom   || '-';
+                const stock = opt?.dataset?.stock  || '0';
+                row.querySelector('.stock-display').value = parseFloat(stock).toFixed(2) + ' ' + uom;
+                row.querySelector('.uom-label').textContent = uom;
+                row.querySelector('.qty-input').setAttribute('max', stock);
             });
 
-            document.getElementById('newMaterialsContainer').appendChild(clone);
+            // Recalculate on qty/price change
+            row.addEventListener('input', () => updateSectionSubtotal(section));
 
-            // Initialize Select2 for new select
-            const $select = $('.select2-material-' + newMaterialIndex);
-            $select.select2({
-                theme: 'bootstrap4',
-                width: '100%'
-            });
-
-            // Attach change handler specifically for this Select2 element
-            $select.on('select2:select', function(e) {
-                const option = e.params.data.element;
-                const container = $(this).closest('.new-material-item')[0];
-                const stockDisplay = container.querySelector('.available-stock-display');
-                const uomDisplay = container.querySelector('.uom-display');
-                const qtyInput = container.querySelector('.new-qty-input');
-
-                if (option && option.value) {
-                    const stock = option.dataset.stock;
-                    const uom = option.dataset.uom;
-
-                    stockDisplay.value = parseFloat(stock).toFixed(2) + ' ' + uom;
-                    uomDisplay.textContent = uom;
-                    qtyInput.setAttribute('max', stock);
-                    qtyInput.dataset.available = stock;
-                } else {
-                    stockDisplay.value = '-';
-                    uomDisplay.textContent = '-';
-                    qtyInput.removeAttribute('max');
-                }
-            });
-
-            newMaterialIndex++;
+            materialIndex++;
             updateItemCount();
+        }
+
+        // Section "Add Material" buttons
+        document.querySelectorAll('.add-section-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                addMaterialRow(this.dataset.section);
+            });
         });
 
-        // Remove material button
+        // Remove row
         document.addEventListener('click', function(e) {
-            if (e.target.closest('.remove-material-btn')) {
-                e.target.closest('.new-material-item').remove();
-                updateItemCount();
-            }
+            const btn = e.target.closest('.remove-row-btn');
+            if (!btn) return;
+            const row     = btn.closest('.material-row');
+            const section = row.querySelector('input[name*="bon_out_section"]')?.value;
+            row.remove();
+            if (section) updateSectionSubtotal(section);
+            updateItemCount();
         });
 
         // Form validation
         document.getElementById('bonOutForm').addEventListener('submit', function(e) {
-            const count = parseInt(document.getElementById('itemCount').textContent);
-
-            if (count === 0) {
+            if (document.querySelectorAll('.material-row').length === 0) {
                 e.preventDefault();
-                alert('Please enter at least one material with quantity greater than zero.');
-                return false;
+                alert('Please add at least one material in any section.');
             }
         });
-
-        // Initialize item count
-        updateItemCount();
     </script>
 @endsection

@@ -1,15 +1,15 @@
 @extends('layouts.admin')
-@section('title', 'Add Labor')
-@section('page_title', 'Add Labor')
+@section('title', 'Add Panel')
+@section('page_title', 'Add Panel')
 
 @section('content')
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">New Labor Item</h3>
+                    <h3 class="card-title">New Panel Item</h3>
                 </div>
-                <form action="{{ route('labors.store') }}" method="POST">
+                <form action="{{ route('panels.store') }}" method="POST">
                     @csrf
                     <div class="card-body">
                         @if ($errors->any())
@@ -23,14 +23,14 @@
                         @endif
 
                         <div class="alert alert-info py-2">
-                            <i class="fas fa-info-circle"></i> Labor Code will be auto-generated (LAB-0001, LAB-0002, …)
+                            <i class="fas fa-info-circle"></i> Panel Code will be auto-generated (PNL-0001, PNL-0002, …)
                         </div>
 
                         <div class="form-group">
                             <label>Description <span class="text-danger">*</span></label>
                             <input type="text" name="description"
                                 class="form-control @error('description') is-invalid @enderror"
-                                value="{{ old('description') }}" placeholder="e.g. Polishing, Detailing, etc." required>
+                                value="{{ old('description') }}" placeholder="e.g. Bumper Depan" required>
                             @error('description')
                                 <span class="invalid-feedback">{{ $message }}</span>
                             @enderror
@@ -109,7 +109,7 @@
                     </div>
                     <div class="card-footer">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
-                        <a href="{{ route('labors.index') }}" class="btn btn-secondary ml-2">Cancel</a>
+                        <a href="{{ route('panels.index') }}" class="btn btn-secondary ml-2">Cancel</a>
                     </div>
                 </form>
             </div>

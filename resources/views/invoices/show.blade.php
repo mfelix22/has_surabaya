@@ -134,37 +134,27 @@
                         </div>
                     </div>
 
+
                     <hr>
-                    <h6>Work Order Items</h6>
+                    <h6>Panels</h6>
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th>Total</th>
+                                <th>Code</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th class="text-right">Total (Rp)</th>
+                                <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($invoice->workOrder->items as $item)
+                            @foreach ($invoice->workOrder->panelLabors as $panel)
                                 <tr>
-                                    <td>{{ $item->item->name }}</td>
-                                    <td>{{ number_format($item->actual_quantity ?? ($item->demand_quantity ?? 0), 2) }}
-                                        {{ $item->item->smallestUom->code }}</td>
-                                    <td>
-                                        @if (!is_null($item->unit_price) && (float) $item->unit_price > 0)
-                                            Rp {{ number_format($item->unit_price, 0, ',', '.') }}
-                                        @else
-                                            <span class="text-muted">Included in Paket</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if (!is_null($item->total_price) && (float) $item->total_price > 0)
-                                            Rp {{ number_format($item->total_price, 0, ',', '.') }}
-                                        @else
-                                            <span class="text-muted">Included in Paket</span>
-                                        @endif
-                                    </td>
+                                    <td>{{ $panel->panel?->panel_code ?? '—' }}</td>
+                                    <td>{{ $panel->description }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float) ($panel->qty ?? 1), 2, '.', ''), '0'), '.') }}</td>
+                                    <td class="text-right">{{ $panel->total_price ? number_format($panel->total_price, 0, ',', '.') : '—' }}</td>
+                                    <td>{{ $panel->remarks ?? '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -175,24 +165,29 @@
                     <table class="table table-striped">
                         <thead>
                             <tr>
+                                <th>Code</th>
                                 <th>Description</th>
                                 <th>Qty</th>
+                                <th class="text-right">Total (Rp)</th>
                                 <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($invoice->workOrder->labors as $labor)
+                            @foreach ($invoice->workOrder->generalLabors as $labor)
                                 <tr>
+                                    <td>{{ $labor->labor?->labor_code ?? '—' }}</td>
                                     <td>{{ $labor->description }}</td>
-                                    <td>{{ rtrim(rtrim(number_format((float) ($labor->qty ?? 1), 2, '.', ''), '0'), '.') }}
-                                    </td>
+                                    <td>{{ rtrim(rtrim(number_format((float) ($labor->qty ?? 1), 2, '.', ''), '0'), '.') }}</td>
+                                    <td class="text-right">{{ $labor->total_price ? number_format($labor->total_price, 0, ',', '.') : '—' }}</td>
                                     <td>{{ $labor->remarks ?? '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                    <small class="text-muted">Labor fee is fixed at Rp 75.000 per paket and already included in
-                        total.</small>
+                    @php $baseLabor = $invoice->workOrder->generalLabors->where('is_extra', false)->sum('total_price'); @endphp
+                    @if ($baseLabor > 0)
+                        <small class="text-muted">Base labor: Rp {{ number_format($baseLabor, 0, ',', '.') }} (included in total).</small>
+                    @endif
 
                     <hr>
                     <div class="row">
@@ -354,7 +349,9 @@
                                                 count($aggregatedItems) > 0
                                                     ? $totalItemCogs
                                                     : (float) ($invoice->cogm_material ?? 0);
-                                            $grossProfit = ($invoice->grand_total ?? 0) - $materialCogs;
+                                            $laborCogs = (float) ($invoice->cogm_labor ?? 0);
+                                            $totalCogs = $materialCogs + $laborCogs;
+                                            $grossProfit = ($invoice->grand_total ?? 0) - $totalCogs;
                                             $margin =
                                                 ($invoice->grand_total ?? 0) > 0
                                                     ? ($grossProfit / $invoice->grand_total) * 100
@@ -364,9 +361,13 @@
                                             <th width="50%">Materials Cost (COGS):</th>
                                             <td>Rp {{ number_format($materialCogs, 0, ',', '.') }}</td>
                                         </tr>
+                                        <tr>
+                                            <th>Labor Cost (COGS):</th>
+                                            <td>Rp {{ number_format($laborCogs, 0, ',', '.') }}</td>
+                                        </tr>
                                         <tr class="table-warning">
-                                            <th><strong>Total COGS (Material Only):</strong></th>
-                                            <td><strong>Rp {{ number_format($materialCogs, 0, ',', '.') }}</strong></td>
+                                            <th><strong>Total COGS:</strong></th>
+                                            <td><strong>Rp {{ number_format($totalCogs, 0, ',', '.') }}</strong></td>
                                         </tr>
                                         <tr>
                                             <th>Revenue (Grand Total):</th>

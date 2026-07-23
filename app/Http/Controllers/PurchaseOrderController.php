@@ -298,6 +298,7 @@ class PurchaseOrderController extends Controller
             'creator',
             'approver',
             'revoker',
+            'closer',
             'details.item',
             'details.uom',
             'details.purchaseOrderInvoiceLines',
@@ -1110,6 +1111,55 @@ class PurchaseOrderController extends Controller
 
         return redirect()->route('purchase_orders.show', $purchaseOrder)
             ->with('success', 'Purchase Order has been completed successfully.');
+    }
+
+    public function closeSO(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasAnyRole(['purchasing', 'admin', 'super_admin', 'manager', 'director'])) {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'You do not have permission to close this Service Order.');
+        }
+
+        if ($purchaseOrder->po_type !== 'service_order') {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'This action is only available for Service Orders (PPJ).');
+        }
+
+        if ($purchaseOrder->status !== 'approved') {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'Only approved Service Orders can be closed.');
+        }
+
+        $linkedPR = $purchaseOrder->purchaseRequest;
+        if (!$linkedPR || !$linkedPR->berita_acara_path) {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'Please upload the Berita Acara on the linked PPJ before closing this Service Order.');
+        }
+
+        $validated = $request->validate([
+            'nomor_nota' => 'required|string|max:100',
+        ]);
+
+        $purchaseOrder->update([
+            'status'     => 'completed',
+            'closed_by'  => auth()->id(),
+            'closed_at'  => now(),
+            'nomor_nota' => $validated['nomor_nota'],
+        ]);
+
+        $this->autoClosePurchaseRequest($purchaseOrder);
+
+        NotificationService::send(
+            $purchaseOrder->created_by,
+            'so_closed',
+            'Service Order Closed',
+            "SO {$purchaseOrder->po_number} has been closed by " . auth()->user()->name . ".",
+            route('purchase_orders.show', $purchaseOrder)
+        );
+
+        return redirect()->route('purchase_orders.show', $purchaseOrder)
+            ->with('success', 'Service Order has been closed successfully.');
     }
 
     /**

@@ -906,7 +906,7 @@
             }
 
             // Fetch PR data via AJAX
-            fetch(`{{ route('purchase_requests.json', ['purchaseRequest' => ':id'], false) }}`.replace(':id', prSelect.value))
+            fetch(`{{ route('purchase_requests.json', ['purchaseRequest' => ':id']) }}`.replace(':id', prSelect.value))
                 .then(response => response.json())
                 .then(prData => {
                     console.log('prData:', prData);
@@ -978,7 +978,7 @@
             if (!this.value) return;
 
             // Fetch PR data via AJAX
-            fetch(`{{ route('purchase_requests.json', ['purchaseRequest' => ':id'], false) }}`.replace(':id', this.value))
+            fetch(`{{ route('purchase_requests.json', ['purchaseRequest' => ':id']) }}`.replace(':id', this.value))
                 .then(response => response.json())
                 .then(prData => {
                     if (!prData || !prData.details || prData.details.length === 0) return;

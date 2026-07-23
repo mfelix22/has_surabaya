@@ -128,6 +128,7 @@ class BonOutController extends Controller
             'items.*.actual_quantity'    => 'required|numeric|min:0',
             'items.*.work_order_item_id' => 'nullable|exists:work_order_items,id',
             'items.*.unit_price'         => 'nullable|numeric|min:0',
+            'items.*.remark'             => 'nullable|string|max:255',
         ]);
 
         $workOrder = WorkOrder::with('items.item')->findOrFail($validated['work_order_id']);
@@ -352,6 +353,7 @@ class BonOutController extends Controller
             'items.*.actual_quantity'    => 'required|numeric|min:0',
             'items.*.work_order_item_id' => 'nullable|exists:work_order_items,id',
             'items.*.unit_price'         => 'nullable|numeric|min:0',
+            'items.*.remark'             => 'nullable|string|max:255',
         ]);
 
         // Filter out zero-quantity rows for new items (existing rows can be 0 = not used today)
@@ -374,6 +376,7 @@ class BonOutController extends Controller
                     $bonOutItem = BonOutItem::findOrFail($itemData['bon_out_item_id']);
                     $bonOutItem->update([
                         'actual_quantity' => $itemData['actual_quantity'],
+                        'remark'          => $itemData['remark'] ?? $bonOutItem->remark,
                     ]);
                     $existingIds[] = $bonOutItem->id;
                 }
@@ -402,6 +405,7 @@ class BonOutController extends Controller
                         'demand_quantity'    => $demandQty,
                         'actual_quantity'    => $itemData['actual_quantity'],
                         'unit_price'         => $unitPrice,
+                        'remark'             => $itemData['remark'] ?? null,
                     ]);
                 }
             }

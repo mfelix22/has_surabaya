@@ -14,7 +14,7 @@
                             <p class="text-muted mb-0">Snapshot as of {{ now()->format('d M Y H:i') }}</p>
                         </div>
                         <div class="mt-2 mt-md-0">
-                            @if (auth()->user()->hasAnyRole(['warehouse', 'admin', 'super_admin', 'director']))
+                            @if (auth()->user()->hasAnyRole(['service_advisor', 'admin', 'super_admin', 'director']))
                                 <a href="{{ route('work_orders.create') }}" class="btn btn-primary btn-sm mr-1">
                                     <i class="fas fa-plus"></i> New Work Order
                                 </a>
@@ -189,7 +189,7 @@
                                             <th>WO #</th>
                                             <th>Customer</th>
                                             <th>Vehicle</th>
-                                            <th>Package / Description</th>
+                                            <th>Panel / Description</th>
                                             <th class="text-right">Total (Rp)</th>
                                             <th>Status</th>
                                             <th>Created</th>
@@ -208,10 +208,17 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    @if ($wo->paket_name)
-                                                        {{ $wo->paket_name }}
-                                                        @if ($wo->paket_size)<span class="badge badge-light ml-1">{{ $wo->paket_size }}</span>@endif
-                                                    @else
+                                                    @php
+                                                        $panelCount = $wo->labors?->where('is_extra', false)->count() ?? 0;
+                                                        $tierLabels = ['0_300'=>'0–300jt','300_500'=>'300–500jt','500_800'=>'500–800jt','800_2000'=>'800jt–2M'];
+                                                    @endphp
+                                                    @if ($panelCount > 0)
+                                                        <span class="badge badge-light border mr-1">{{ $panelCount }} Panel</span>
+                                                    @endif
+                                                    @if ($wo->vehicle_price_tier)
+                                                        <span class="badge badge-light border">{{ $tierLabels[$wo->vehicle_price_tier] ?? $wo->vehicle_price_tier }}</span>
+                                                    @endif
+                                                    @if (!$panelCount && !$wo->vehicle_price_tier)
                                                         <span class="text-muted">{{ Str::limit($wo->description, 40) }}</span>
                                                     @endif
                                                 </td>
@@ -292,9 +299,17 @@
                         var vehicle = wo.vehicle_plate;
                         if (wo.vehicle_merk) vehicle += '<br><small class="text-muted">' + wo.vehicle_merk + ' ' + wo.vehicle_type_year + '</small>';
 
-                        var pkg = wo.paket_name
-                            ? wo.paket_name + (wo.paket_size ? ' <span class="badge badge-light">' + wo.paket_size + '</span>' : '')
-                            : '<span class="text-muted">' + (wo.description ? wo.description.substring(0, 40) + (wo.description.length > 40 ? '…' : '') : '-') + '</span>';
+                        var tierLabels = {'0_300':'0–300jt','300_500':'300–500jt','500_800':'500–800jt','800_2000':'800jt–2M'};
+                        var pkg = '';
+                        if (wo.panel_count > 0) {
+                            pkg += '<span class="badge badge-light border mr-1">' + wo.panel_count + ' Panel</span>';
+                        }
+                        if (wo.vehicle_price_tier) {
+                            pkg += '<span class="badge badge-light border">' + (tierLabels[wo.vehicle_price_tier] || wo.vehicle_price_tier) + '</span>';
+                        }
+                        if (!wo.panel_count && !wo.vehicle_price_tier) {
+                            pkg = '<span class="text-muted">' + (wo.description ? wo.description.substring(0, 40) + (wo.description.length > 40 ? '…' : '') : '-') + '</span>';
+                        }
 
                         var deadline = '-';
                         if (wo.deadline) {
@@ -490,15 +505,15 @@
                                     <td>{{ $trx->item->code ?? '-' }}</td>
                                     <td>
                                         @php
-                                            $trxClass =
-                                                $trx->transaction_type === 'in'
-                                                    ? 'success'
-                                                    : ($trx->transaction_type === 'out'
-                                                        ? 'danger'
-                                                        : 'warning');
+                                            $trxClass = match ($trx->transaction_type) {
+                                                'in' => 'success',
+                                                'out' => 'danger',
+                                                'opening' => 'info',
+                                                default => 'warning',
+                                            };
                                         @endphp
                                         <span
-                                            class="badge badge-{{ $trxClass }}">{{ ucfirst($trx->transaction_type) }}</span>
+                                            class="badge badge-{{ $trxClass }}">{{ $trx->typeLabel() }}</span>
                                     </td>
                                     <td class="text-right">
                                         {{ rtrim(rtrim(number_format($trx->quantity, 2, '.', ''), '0'), '.') }}</td>

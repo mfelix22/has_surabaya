@@ -19,7 +19,7 @@
                     <div class="card-tools">
                         @if (in_array($purchaseRequest->status, ['completed', 'printed', 'closed']))
                             @if (\App\Helpers\PermissionHelper::canPrint('purchase_requests') || auth()->user()->hasAnyRole(['purchasing']))
-                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print', now()->addMinutes(5), $purchaseRequest, false) }}"
+                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print', now()->addMinutes(5), $purchaseRequest) }}"
                                     class="btn btn-secondary btn-sm" target="_blank">
                                     <i class="fas fa-print"></i> Print
                                 </a>
@@ -188,8 +188,8 @@
                                     <td><strong>Created By:</strong></td>
                                     <td>{{ $purchaseRequest->requestor->name }}</td>
                                     <td>
-                                        @if ($purchaseRequest->requestor->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->requestor->signature_path))
-                                            <img src="{{ route('users.signature', $purchaseRequest->requestor, false) }}"
+                                        @if ($purchaseRequest->requestor->signature_path)
+                                            <img src="{{ route('users.signature', $purchaseRequest->requestor) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -210,8 +210,8 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->deptHeadApprover && $purchaseRequest->deptHeadApprover->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->deptHeadApprover->signature_path))
-                                            <img src="{{ route('users.signature', $purchaseRequest->deptHeadApprover, false) }}"
+                                        @if ($purchaseRequest->deptHeadApprover && $purchaseRequest->deptHeadApprover->signature_path)
+                                            <img src="{{ route('users.signature', $purchaseRequest->deptHeadApprover) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -242,8 +242,8 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->gmApprover && $purchaseRequest->gmApprover->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->gmApprover->signature_path))
-                                            <img src="{{ route('users.signature', $purchaseRequest->gmApprover, false) }}"
+                                        @if ($purchaseRequest->gmApprover && $purchaseRequest->gmApprover->signature_path)
+                                            <img src="{{ route('users.signature', $purchaseRequest->gmApprover) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
@@ -264,14 +264,15 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($purchaseRequest->purchasingReceiver && $purchaseRequest->purchasingReceiver->signature_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($purchaseRequest->purchasingReceiver->signature_path))
-                                            <img src="{{ route('users.signature', $purchaseRequest->purchasingReceiver, false) }}"
+                                        @if ($purchaseRequest->purchasingReceiver && $purchaseRequest->purchasingReceiver->signature_path)
+                                            <img src="{{ route('users.signature', $purchaseRequest->purchasingReceiver) }}"
                                                 alt="Signature" style="max-width: 80px; max-height: 40px;">
                                         @else
                                             <span class="text-muted text-sm">-</span>
                                         @endif
                                     </td>
                                 </tr>
+
                             </table>
                         </div>
                     </div>
@@ -408,7 +409,18 @@
                         <h6>Related Purchase Orders</h6>
                         <ul>
                             @foreach ($purchaseRequest->purchaseOrders as $po)
-                                <li><a href="{{ route('purchase_orders.show', $po) }}">{{ $po->po_number }}</a></li>
+                                <li class="mb-1">
+                                    <a href="{{ route('purchase_orders.show', $po) }}">{{ $po->po_number }}</a>
+                                    @if ($po->po_type === 'service_order' && $po->status === 'approved')
+                                        @if ($purchaseRequest->requested_by === auth()->id() || auth()->user()->hasAnyRole(['admin', 'super_admin']))
+                                            <button type="button" class="btn btn-xs btn-info ml-2" data-toggle="modal"
+                                                data-target="#uploadBeritaAcaraModal_{{ $po->id }}">
+                                                <i class="fas fa-file-upload"></i>
+                                                {{ $po->berita_acara_path ? 'Re-upload' : 'Upload Berita Acara' }}
+                                            </button>
+                                        @endif
+                                    @endif
+                                </li>
                             @endforeach
                         </ul>
                     @endif
@@ -444,6 +456,62 @@
             </div>
         </div>
     </div>
+
+    @foreach ($purchaseRequest->purchaseOrders as $po)
+        @if ($po->po_type === 'service_order' && $po->status === 'approved' &&
+                ($purchaseRequest->requested_by === auth()->id() || auth()->user()->hasAnyRole(['admin', 'super_admin'])))
+            <div class="modal fade" id="uploadBeritaAcaraModal_{{ $po->id }}" tabindex="-1" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <form action="{{ route('purchase_orders.upload_berita_acara', $po) }}" method="POST"
+                            enctype="multipart/form-data">
+                            @csrf
+                            <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title"><i class="fas fa-file-upload"></i> Upload Berita Acara</h5>
+                                <button type="button" class="close text-white"
+                                    data-dismiss="modal"><span>&times;</span></button>
+                            </div>
+                            <div class="modal-body">
+                                @if ($po->berita_acara_path)
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        A Berita Acara has already been uploaded for SO
+                                        <strong>{{ $po->po_number }}</strong> on
+                                        <strong>{{ $po->berita_acara_uploaded_at?->format('d M Y H:i') }}</strong>
+                                        by <strong>{{ optional($po->beritaAcaraUploader)->name }}</strong>.
+                                        Uploading a new file will replace it.
+                                        <br>
+                                        <a href="{{ asset('storage/' . $po->berita_acara_path) }}" target="_blank"
+                                            class="btn btn-sm btn-outline-info mt-1">
+                                            <i class="fas fa-eye"></i> View Current File
+                                        </a>
+                                    </div>
+                                @else
+                                    <div class="alert alert-secondary">
+                                        <i class="fas fa-info-circle"></i>
+                                        Upload the Berita Acara document for SO <strong>{{ $po->po_number }}</strong>.
+                                        Once uploaded, this Service Order can be closed by purchasing.
+                                    </div>
+                                @endif
+                                <div class="form-group">
+                                    <label for="berita_acara_{{ $po->id }}">Berita Acara File <span class="text-danger">*</span></label>
+                                    <input type="file" name="berita_acara" id="berita_acara_{{ $po->id }}" class="form-control-file"
+                                        accept=".pdf,.jpg,.jpeg,.png" required>
+                                    <small class="form-text text-muted">Accepted: PDF, JPG, PNG. Max size: 5 MB.</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-info">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endforeach
 
     {{-- Cancel Modal --}}
     <div class="modal fade" id="cancelPrModal" tabindex="-1" role="dialog">

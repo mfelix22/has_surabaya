@@ -37,6 +37,8 @@
                                                 Internal WS</option>
                                             <option value="INT_W3" {{ old('account_code') === 'INT_W3' ? 'selected' : '' }}>
                                                 Internal W3</option>
+                                            <option value="ASURANSI" {{ old('account_code') === 'ASURANSI' ? 'selected' : '' }}>
+                                                Asuransi</option>
                                         </select>
                                         @error('account_code')
                                             <span class="invalid-feedback">{{ $message }}</span>
@@ -55,7 +57,7 @@
                                                 <option value="{{ $refWo->id }}"
                                                     {{ old('reference_wo_id') == $refWo->id ? 'selected' : '' }}>
                                                     {{ $refWo->wo_number }} — {{ $refWo->customer->name ?? '-' }} —
-                                                    {{ $refWo->paket_name ?? '-' }}
+                                                    {{ $refWo->vehicle_plate ?? '-' }}
                                                 </option>
                                             @endforeach
                                         </select>
@@ -193,155 +195,136 @@
                                     </div>
                                 </div>
 
-                                {{-- ===== PAKET SELECTION ===== --}}
+                                {{-- Col 3: Panel list + Labor + Tier + Price Summary --}}
                                 <div class="col-md-4">
-                                    <h6><i class="fas fa-tags"></i> Paket HR Auto Studio 2026</h6>
-                                    <div class="form-group">
-                                        <label for="paket_select">Pilih Paket</label>
-                                        <select id="paket_select" class="form-control select2">
-                                            <option value="">-- Pilih Paket --</option>
-                                            @foreach ($packages as $category => $pkgs)
-                                                <optgroup label="{{ $category }}">
-                                                    @foreach ($pkgs as $code => $pkg)
-                                                        <option value="{{ $code }}"
-                                                            data-name="{{ $pkg['name'] }}"
-                                                            data-category="{{ $category }}"
-                                                            data-sizes='@json($pkg['sizes'])'
-                                                            data-bom='@json($pkg['bom'] ?? [])'>
-                                                            {{ $code }} &mdash; {{ $pkg['name'] }}
+                                <h6><i class="fas fa-tools"></i> Panel yang Dikerjakan</h6>
+                                <p class="text-muted small mb-2">Pilih panel, lalu tentukan kisaran harga kendaraan di bawah.</p>
+
+                                <div id="panels-container">
+                                    <div class="panel-row card mb-2 border-left-success">
+                                        <div class="card-body py-2">
+                                            <div class="form-group mb-1">
+                                                <label class="mb-1"><strong>Panel</strong></label>
+                                                <select name="panels[0][panel_id]" class="form-control form-control-sm panel-select">
+                                                    <option value="">-- Pilih Panel --</option>
+                                                    @foreach ($masterPanels as $mp)
+                                                        <option value="{{ $mp->id }}"
+                                                            data-price="{{ $mp->price }}"
+                                                            data-p0300="{{ $mp->price_0_300 }}"
+                                                            data-p300500="{{ $mp->price_300_500 }}"
+                                                            data-p500800="{{ $mp->price_500_800 }}"
+                                                            data-p8002000="{{ $mp->price_800_2000 }}">
+                                                            {{ $mp->panel_code }} — {{ $mp->description }}
                                                         </option>
                                                     @endforeach
-                                                </optgroup>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="form-group" id="size_field" style="display:none;">
-                                        <label for="size_select">Ukuran / Variant</label>
-                                        <select id="size_select" class="form-control select2">
-                                            <option value="">-- Pilih Ukuran --</option>
-                                        </select>
-                                    </div>
-
-                                    {{-- Hidden fields stored to DB --}}
-                                    <input type="hidden" name="paket_code" id="paket_code"
-                                        value="{{ old('paket_code') }}">
-                                    <input type="hidden" name="paket_name" id="paket_name"
-                                        value="{{ old('paket_name') }}">
-                                    <input type="hidden" name="paket_size" id="paket_size"
-                                        value="{{ old('paket_size') }}">
-                                    <input type="hidden" name="paket_grand_total" id="paket_grand_total"
-                                        value="{{ old('paket_grand_total', 0) }}">
-
-                                    {{-- Ala-Carte: add extra services --}}
-                                    <div id="alacarte-section" style="display:none;margin-top:10px;">
-                                        <label class="font-weight-bold text-primary"><i class="fas fa-plus-circle"></i>
-                                            Add
-                                            more Ala-Carte services:</label>
-                                        <div class="input-group mb-1">
-                                            <select id="alacarte-add-select" class="form-control form-control-sm">
-                                                <option value="">-- Select service --</option>
-                                            </select>
-                                            <div class="input-group-append">
-                                                <button type="button" class="btn btn-sm btn-outline-primary"
-                                                    id="alacarte-add-btn">
-                                                    <i class="fas fa-plus"></i> Add
-                                                </button>
+                                                </select>
                                             </div>
-                                        </div>
-                                        <div id="alacarte-chips" class="mb-1"></div>
-                                    </div>
-
-                                    {{-- Price breakdown display --}}
-                                    <div id="paket_price_display" style="display:none;">
-                                        <table class="table table-sm table-bordered mt-2">
-                                            <tr>
-                                                <td>Jasa Paket</td>
-                                                <td class="text-right"><strong id="display_material">Rp 0</strong></td>
-                                            </tr>
-                                            <tr>
-                                                <td>Labor (Paket)</td>
-                                                <td class="text-right"><strong>Rp 75.000</strong></td>
-                                            </tr>
-                                            <tr id="display_addon_row" style="display:none;">
-                                                <td>Addon Labors</td>
-                                                <td class="text-right"><strong id="display_addon_labor">Rp 0</strong></td>
-                                            </tr>
-                                            <tr class="table-success">
-                                                <td><strong>Grand Total</strong></td>
-                                                <td class="text-right text-success"><strong id="display_grand_total">Rp
-                                                        0</strong></td>
-                                            </tr>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <hr>
-                            <h5><i class="fas fa-boxes"></i> Materials Used</h5>
-                            <select id="item-options-source" class="d-none">
-                                <option value="">Select Item (Optional)</option>
-                                @foreach ($items as $item)
-                                    @php
-                                        $stock = (float) $item->stocks->sum('quantity');
-                                        $stockFormatted =
-                                            $stock == floor($stock)
-                                                ? number_format($stock, 0)
-                                                : rtrim(rtrim(number_format($stock, 2), '0'), '.');
-                                    @endphp
-                                    <option value="{{ $item->id }}" data-stock="{{ $stockFormatted }}"
-                                        data-uom="{{ $item->smallestUom->code ?? '-' }}"
-                                        data-code="{{ $item->code }}">
-                                        [{{ $item->code }}] {{ $item->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <div id="items-container"></div>
-                            <button type="button" class="btn btn-success btn-sm" id="add-item">
-                                <i class="fas fa-plus"></i> Add Material
-                            </button>
-
-                            <hr>
-                            <h5><i class="fas fa-user-tie"></i> Labor</h5>
-
-                            <div id="labors-container">
-                                <div class="labor-row card mb-2 border-left-success">
-                                    <div class="card-body py-2">
-                                        <div class="row align-items-end">
-                                            <div class="col-md-6">
-                                                <div class="form-group mb-0">
-                                                    <label><strong>Labor Description</strong></label>
-                                                    <input type="text" name="labors[0][description]"
-                                                        class="form-control labor-description"
-                                                        placeholder="Enter labor description">
+                                            <div class="row">
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Qty</strong></label>
+                                                    <input type="number" name="panels[0][qty]" class="form-control form-control-sm panel-qty" step="1" min="1" value="1">
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Rate</strong></label>
+                                                    <input type="number" class="form-control form-control-sm panel-rate" readonly>
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Total</strong></label>
+                                                    <input type="text" class="form-control form-control-sm panel-total-display" readonly>
                                                 </div>
                                             </div>
-                                            <div class="col-md-2">
-                                                <div class="form-group mb-0">
-                                                    <label><strong>Qty</strong></label>
-                                                    <input type="number" name="labors[0][qty]"
-                                                        class="form-control labor-qty" step="1" min="1"
-                                                        value="1">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="form-group mb-0">
-                                                    <label><strong>Remarks</strong></label>
-                                                    <input type="text" name="labors[0][remarks]" class="form-control"
-                                                        placeholder="Optional notes">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-1">
-                                                <button type="button" class="btn btn-danger btn-sm remove-labor">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
+                                            <div class="text-right mt-1">
+                                                <button type="button" class="btn btn-danger btn-xs remove-panel"><i class="fas fa-trash"></i></button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <button type="button" class="btn btn-success btn-sm" id="add-labor">
-                                <i class="fas fa-plus"></i> Add Labor Entry
-                            </button>
+                                <button type="button" class="btn btn-success btn-sm mb-3" id="add-panel">
+                                    <i class="fas fa-plus"></i> Tambah Panel
+                                </button>
+
+                                <h6><i class="fas fa-wrench"></i> Labor</h6>
+                                <p class="text-muted small mb-2">Pilih pekerjaan umum yang dikerjakan.</p>
+
+                                <div id="labors-container">
+                                    <div class="labor-row card mb-2 border-left-info">
+                                        <div class="card-body py-2">
+                                            <div class="form-group mb-1">
+                                                <label class="mb-1"><strong>Labor</strong></label>
+                                                <select name="labors[0][labor_id]" class="form-control form-control-sm labor-select">
+                                                    <option value="">-- Pilih Labor --</option>
+                                                    @foreach ($masterLabors as $ml)
+                                                        <option value="{{ $ml->id }}"
+                                                            data-price="{{ $ml->price }}"
+                                                            data-p0300="{{ $ml->price_0_300 }}"
+                                                            data-p300500="{{ $ml->price_300_500 }}"
+                                                            data-p500800="{{ $ml->price_500_800 }}"
+                                                            data-p8002000="{{ $ml->price_800_2000 }}">
+                                                            {{ $ml->labor_code }} — {{ $ml->description }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Qty</strong></label>
+                                                    <input type="number" name="labors[0][qty]" class="form-control form-control-sm labor-qty" step="1" min="1" value="1">
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Rate</strong></label>
+                                                    <input type="number" class="form-control form-control-sm labor-rate" readonly>
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="mb-1 small"><strong>Total</strong></label>
+                                                    <input type="text" class="form-control form-control-sm labor-total-display" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="text-right mt-1">
+                                                <button type="button" class="btn btn-danger btn-xs remove-labor"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-info btn-sm mb-3" id="add-labor">
+                                    <i class="fas fa-plus"></i> Tambah Labor
+                                </button>
+
+                                <div class="form-group">
+                                    <label for="vehicle_price_tier"><i class="fas fa-car-crash mr-1"></i> Kisaran Harga Kendaraan <span class="text-danger">*</span></label>
+                                    <select name="vehicle_price_tier" id="vehicle_price_tier"
+                                        class="form-control @error('vehicle_price_tier') is-invalid @enderror">
+                                        <option value="">-- Pilih Kisaran Harga --</option>
+                                        <option value="0_300"   {{ old('vehicle_price_tier') === '0_300'   ? 'selected' : '' }}>0 – 300 juta</option>
+                                        <option value="300_500" {{ old('vehicle_price_tier') === '300_500' ? 'selected' : '' }}>300 – 500 juta</option>
+                                        <option value="500_800" {{ old('vehicle_price_tier') === '500_800' ? 'selected' : '' }}>500 – 800 juta</option>
+                                        <option value="800_2000" {{ old('vehicle_price_tier') === '800_2000' ? 'selected' : '' }}>800 juta – 2 miliar</option>
+                                    </select>
+                                    @error('vehicle_price_tier')
+                                        <span class="invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                    <small class="text-muted">Menentukan tarif untuk semua panel di atas.</small>
+                                </div>
+
+                                <div id="panel_price_summary" style="display:none;">
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <tr>
+                                            <td>Total Panel</td>
+                                            <td class="text-right"><strong id="display_panel_total">Rp 0</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Total Labor</td>
+                                            <td class="text-right"><strong id="display_labor_total">Rp 0</strong></td>
+                                        </tr>
+                                        <tr class="table-success">
+                                            <td><strong>Grand Total</strong></td>
+                                            <td class="text-right text-success"><strong id="display_grand_total">Rp 0</strong></td>
+                                        </tr>
+                                    </table>
+                                </div>
+
+                                </div>
+                            </div>{{-- end row --}}
+
                         </div>
 
                         <div class="card-footer">
@@ -355,554 +338,233 @@
 
         <script>
             let itemIndex = 0,
+                panelIndex = 1,
                 laborIndex = 1;
             let initItemSelect2Timer = null;
-            const LABOR_FIXED = 75000;
 
-            // ===== PAKET SELECTOR =====
-            const ALACARTE_CATEGORY = 'PAKET ALA-CARTE';
-            const paketSelect = document.getElementById('paket_select');
-            const sizeSelect = document.getElementById('size_select');
-            const sizeField = document.getElementById('size_field');
-            const alacarteSection = document.getElementById('alacarte-section');
-            const alacarteAddSel = document.getElementById('alacarte-add-select');
-            const alacarteAddBtn = document.getElementById('alacarte-add-btn');
-            const alacarteChips = document.getElementById('alacarte-chips');
-
-            // Tracks all selected packages: [{code, name, size, price, bom}]
-            let selectedPackages = [];
-
-            console.log('Paket selector initialized. paketSelect:', paketSelect);
-
-            // ---- Rebuild hidden inputs from selectedPackages ----
-            function rebuildPrimaryFields() {
-                if (!selectedPackages.length) return;
-                const codes = selectedPackages.map(p => p.code);
-                const names = selectedPackages.map(p => p.name);
-                const total = selectedPackages.reduce((s, p) => s + parseFloat(p.price), 0);
-                const sizes = selectedPackages.filter(p => p.size && p.size !== 'All').map(p => p.size);
-                document.getElementById('paket_code').value = codes.join(' + ');
-                document.getElementById('paket_name').value = names.join(' + ');
-                document.getElementById('paket_size').value = sizes.length ? sizes.join(', ') : 'All';
-                document.getElementById('paket_grand_total').value = total;
-                updatePriceDisplay(total);
+            // ===== PANEL + LABOR PRICE SUMMARY =====
+            function getPriceTierKey() {
+                const el = document.getElementById('vehicle_price_tier');
+                const tier = el ? el.value : '';
+                const map = {
+                    '0_300':   'p0300',
+                    '300_500': 'p300500',
+                    '500_800': 'p500800',
+                    '800_2000':'p8002000'
+                };
+                return map[tier] || null;
             }
 
-            // ---- Render chips for extras (index > 0) ----
-            function renderChips() {
-                alacarteChips.innerHTML = '';
-                selectedPackages.slice(1).forEach(pkg => {
-                    const el = document.createElement('span');
-                    el.className = 'badge badge-primary mr-1 mb-1 p-2';
-                    el.style.fontSize = '12px';
-                    el.innerHTML =
-                        `${pkg.code} &ndash; ${pkg.name}${pkg.size !== 'All' ? ' (' + pkg.size + ')' : ''}
-                    &nbsp; Rp ${pkg.price.toLocaleString('id-ID')}
-                    <a href="#" class="text-white ml-1" data-rm-pkg="${pkg.code}" style="text-decoration:none;">&times;</a>`;
-                    alacarteChips.appendChild(el);
+            function getPriceFromOption(opt, tierKey) {
+                if (tierKey && opt.dataset[tierKey] && parseFloat(opt.dataset[tierKey]) > 0) {
+                    return parseFloat(opt.dataset[tierKey]);
+                }
+                return parseFloat(opt.dataset.price) || 0;
+            }
+
+            function updateRowTotal(row, tierKey) {
+                const isPanel = row.classList.contains('panel-row');
+                const select = row.querySelector(isPanel ? '.panel-select' : '.labor-select');
+                const qtyInput = row.querySelector(isPanel ? '.panel-qty' : '.labor-qty');
+                const rateInput = row.querySelector(isPanel ? '.panel-rate' : '.labor-rate');
+                const totalInput = row.querySelector(isPanel ? '.panel-total-display' : '.labor-total-display');
+                if (!select || !qtyInput) return 0;
+
+                if (!select.value) {
+                    if (rateInput) rateInput.value = '';
+                    if (totalInput) totalInput.value = '';
+                    return 0;
+                }
+
+                const opt = select.options[select.selectedIndex];
+                const price = getPriceFromOption(opt, tierKey);
+                const qty = parseFloat(qtyInput.value) || 0;
+                const rowTotal = price * qty;
+                if (rateInput) rateInput.value = price;
+                if (totalInput) totalInput.value = rowTotal.toLocaleString('id-ID');
+                return rowTotal;
+            }
+
+            function updatePriceDisplay() {
+                const tierKey = getPriceTierKey();
+                let panelTotal = 0;
+                document.querySelectorAll('.panel-row').forEach(function(row) {
+                    panelTotal += updateRowTotal(row, tierKey);
                 });
-            }
-
-            alacarteChips.addEventListener('click', function(e) {
-                const a = e.target.closest('a[data-rm-pkg]');
-                if (!a) return;
-                e.preventDefault();
-                const code = a.dataset.rmPkg;
-                removeBomItemsByPkg(code);
-                selectedPackages = selectedPackages.filter(p => p.code !== code);
-                rebuildPrimaryFields();
-                renderChips();
-                buildAlacarteExtras();
-            });
-
-            // ---- Build the "Add extra" dropdown with unused Ala-Carte options ----
-            function buildAlacarteExtras() {
-                alacarteAddSel.innerHTML = '<option value="">-- Select service --</option>';
-                const used = selectedPackages.map(p => p.code);
-                Array.from(paketSelect.options).forEach(opt => {
-                    if (opt.dataset.category === ALACARTE_CATEGORY && opt.value && !used.includes(opt.value)) {
-                        alacarteAddSel.appendChild(opt.cloneNode(true));
-                    }
+                let laborTotal = 0;
+                document.querySelectorAll('.labor-row').forEach(function(row) {
+                    laborTotal += updateRowTotal(row, tierKey);
                 });
-                // Reset size picker
-                const spDiv = document.getElementById('alacarte-size-div');
-                if (spDiv) {
-                    spDiv.style.display = 'none';
-                    spDiv.innerHTML = '';
-                }
-            }
 
-            // Dynamic size picker for extra services
-            alacarteAddSel.addEventListener('change', function() {
-                let spDiv = document.getElementById('alacarte-size-div');
-                if (!spDiv) {
-                    spDiv = document.createElement('div');
-                    spDiv.id = 'alacarte-size-div';
-                    this.closest('.input-group').after(spDiv);
-                }
-                const opt = this.options[this.selectedIndex];
-                if (!opt || !opt.value) {
-                    spDiv.style.display = 'none';
-                    spDiv.innerHTML = '';
-                    return;
-                }
-                const sizes = JSON.parse(opt.dataset.sizes || '{}');
-                const keys = Object.keys(sizes);
-                if (keys.length === 1 && keys[0] === 'All') {
-                    spDiv.style.display = 'none';
-                    spDiv.innerHTML = '';
+                const grandTotal = panelTotal + laborTotal;
+                const summaryEl = document.getElementById('panel_price_summary');
+                if (panelTotal > 0 || laborTotal > 0) {
+                    document.getElementById('display_panel_total').textContent = 'Rp ' + panelTotal.toLocaleString('id-ID');
+                    document.getElementById('display_labor_total').textContent = 'Rp ' + laborTotal.toLocaleString('id-ID');
+                    document.getElementById('display_grand_total').textContent  = 'Rp ' + grandTotal.toLocaleString('id-ID');
+                    summaryEl.style.display = 'block';
                 } else {
-                    let html =
-                        '<select id="alacarte-size-sel" class="form-control form-control-sm mt-1"><option value="">-- Select size --</option>';
-                    keys.forEach(s => {
-                        html +=
-                            `<option value="${s}" data-price="${sizes[s]}">${s} &mdash; Rp ${sizes[s].toLocaleString('id-ID')}</option>`;
-                    });
-                    html += '</select>';
-                    spDiv.innerHTML = html;
-                    spDiv.style.display = 'block';
-                }
-            });
-
-            alacarteAddBtn.addEventListener('click', function() {
-                try {
-                    const opt = alacarteAddSel.options[alacarteAddSel.selectedIndex];
-                    if (!opt || !opt.value) {
-                        alert('Please select a service to add.');
-                        return;
-                    }
-                    const sizes = JSON.parse(opt.dataset.sizes || '{}');
-                    const keys = Object.keys(sizes);
-                    let size = 'All',
-                        price = 0;
-                    if (keys.length === 1 && keys[0] === 'All') {
-                        price = parseFloat(sizes['All']);
-                    } else {
-                        const sSel = document.getElementById('alacarte-size-sel');
-                        if (!sSel || !sSel.value) {
-                            alert('Please select a size for ' + opt.dataset.name);
-                            return;
-                        }
-                        size = sSel.value;
-                        price = parseInt(sSel.options[sSel.selectedIndex].dataset.price);
-                    }
-
-                    let bom = [];
-                    try {
-                        const bomRaw = opt.dataset.bom;
-                        bom = bomRaw ? JSON.parse(bomRaw) : [];
-                    } catch (e) {
-                        console.error('Error parsing ala-carte BOM:', e);
-                    }
-
-                    const pkg = {
-                        code: opt.value,
-                        name: opt.dataset.name,
-                        size,
-                        price,
-                        bom
-                    };
-                    selectedPackages.push(pkg);
-                    if (bom.length > 0) {
-                        appendBomItems(bom, pkg.code);
-                    }
-                    rebuildPrimaryFields();
-                    renderChips();
-                    buildAlacarteExtras();
-                } catch (e) {
-                    console.error('Error in ala-carte add button:', e);
-                    alert('Error adding package. Please check browser console.');
-                }
-            });
-
-            // ---- Main package select change ----
-            // Handle the actual package change logic (will be called by event listeners)
-            function handlePackageChange() {
-                try {
-                    const selectedIndex = this.selectedIndex;
-                    const option = this.options[selectedIndex];
-                    console.log('Handling package change...', option.value, option.dataset.name);
-                    console.log('Raw data-bom:', option.dataset.bom);
-
-                    sizeSelect.innerHTML = '<option value="">-- Pilih Ukuran --</option>';
-                    // Clear old BOM items
-                    selectedPackages.forEach(p => removeBomItemsByPkg(p.code));
-                    selectedPackages = [];
-                    alacarteChips.innerHTML = '';
-                    document.getElementById('paket_code').value = '';
-                    document.getElementById('paket_name').value = '';
-                    document.getElementById('paket_size').value = '';
-                    document.getElementById('paket_grand_total').value = 0;
-                    document.getElementById('paket_price_display').style.display = 'none';
-                    alacarteSection.style.display = 'none';
-
-                    if (!this.value) {
-                        sizeField.style.display = 'none';
-                        return;
-                    }
-
-                    const sizes = JSON.parse(option.dataset.sizes || '{}');
-                    const sizeKeys = Object.keys(sizes);
-                    const category = option.dataset.category || '';
-                    const bomRaw = option.dataset.bom;
-                    let bom = [];
-
-                    try {
-                        bom = bomRaw ? JSON.parse(bomRaw) : [];
-                        console.log('Parsed BOM:', bom);
-                    } catch (e) {
-                        console.error('Error parsing BOM data:', e, 'Raw data:', bomRaw);
-                        bom = [];
-                    }
-
-                    if (sizeKeys.length === 1 && sizeKeys[0] === 'All') {
-                        sizeField.style.display = 'none';
-                        const pkg = {
-                            code: this.value,
-                            name: option.dataset.name,
-                            size: 'All',
-                            price: parseFloat(sizes['All']),
-                            bom
-                        };
-                        selectedPackages = [pkg];
-                        console.log('Single-size package selected with', bom.length, 'BOM items');
-                        if (bom.length > 0) {
-                            console.log('Appending BOM items now...');
-                            appendBomItems(bom, pkg.code);
-                        } else {
-                            console.log('No BOM items to append');
-                        }
-                        rebuildPrimaryFields();
-                    } else {
-                        sizeField.style.display = 'block';
-                        document.getElementById('paket_code').value = this.value;
-                        document.getElementById('paket_name').value = option.dataset.name;
-                        sizeKeys.forEach(size => {
-                            const opt = document.createElement('option');
-                            opt.value = size;
-                            opt.textContent = size + ' \u2014 Rp ' + sizes[size].toLocaleString('id-ID');
-                            opt.dataset.price = sizes[size];
-                            sizeSelect.appendChild(opt);
-                        });
-                        // Clear items until size picked; add an empty placeholder entry
-                        selectedPackages = [{
-                            code: this.value,
-                            name: option.dataset.name,
-                            size: '',
-                            price: 0,
-                            bom
-                        }];
-                        console.log('Multi-size package. BOM stored for later:', bom.length, 'items');
-                    }
-
-                    if (category === ALACARTE_CATEGORY) {
-                        alacarteSection.style.display = 'block';
-                        buildAlacarteExtras();
-                    }
-                } catch (e) {
-                    console.error('Error in paket select change:', e);
+                    summaryEl.style.display = 'none';
                 }
             }
 
-            function handleSizeChange() {
-                try {
-                    if (!this.value) return;
-                    const price = parseInt(this.options[this.selectedIndex].dataset.price);
-                    // Update primary package size & price
-                    if (selectedPackages.length > 0) {
-                        removeBomItemsByPkg(selectedPackages[0].code);
-                        const bom = selectedPackages[0].bom;
-                        selectedPackages[0].size = this.value;
-                        selectedPackages[0].price = price;
-                        if (bom.length > 0) {
-                            console.log('Size selected, appending', bom.length, 'BOM items');
-                            appendBomItems(bom, selectedPackages[0].code);
-                        }
-                    }
-                    rebuildPrimaryFields();
-                } catch (e) {
-                    console.error('Error in size select change:', e);
-                }
-            }
-
-            function updatePriceDisplay(grandTotal) {
-                const material = grandTotal - LABOR_FIXED;
-                document.getElementById('display_material').textContent = 'Rp ' + material.toLocaleString('id-ID');
-                document.getElementById('display_grand_total').textContent = 'Rp ' + (grandTotal + getAddonLaborTotal())
-                    .toLocaleString('id-ID');
-                document.getElementById('paket_price_display').style.display = 'block';
-            }
-
-            function getAddonLaborTotal() {
-                let total = 0;
-                document.querySelectorAll('.labor-total-price').forEach(function(el) {
-                    total += parseFloat(el.value) || 0;
+            // Recompute rates whenever the tier dropdown changes
+            document.addEventListener('DOMContentLoaded', function() {
+                const tierEl = document.getElementById('vehicle_price_tier');
+                if (tierEl) tierEl.addEventListener('change', function() {
+                    updatePriceDisplay();
                 });
-                return total;
-            }
-
-            function refreshGrandTotal() {
-                const paketTotal = parseFloat(document.getElementById('paket_grand_total').value) || 0;
-                if (!paketTotal) return;
-                const addonTotal = getAddonLaborTotal();
-                const material = paketTotal - LABOR_FIXED;
-                document.getElementById('display_material').textContent = 'Rp ' + material.toLocaleString('id-ID');
-                const addonRow = document.getElementById('display_addon_row');
-                if (addonTotal > 0) {
-                    document.getElementById('display_addon_labor').textContent = 'Rp ' + addonTotal.toLocaleString('id-ID');
-                    addonRow.style.display = '';
-                } else {
-                    addonRow.style.display = 'none';
-                }
-                document.getElementById('display_grand_total').textContent = 'Rp ' + (paketTotal + addonTotal).toLocaleString(
-                    'id-ID');
-                document.getElementById('paket_price_display').style.display = 'block';
-            }
+            });
 
             // Stub - will be overridden once jQuery/Select2 are loaded
             function initItemSelect2() {}
 
-            // ===== ITEM ROWS =====
-            function buildItemOptions(selectedItemId = null) {
-                const sourceEl = document.getElementById('item-options-source');
-                if (!sourceEl) return '<option value="">Select Item (Optional)</option>';
-
-                const sid = (selectedItemId !== null && selectedItemId !== undefined) ? String(selectedItemId) : '';
-                let html = '';
-                Array.from(sourceEl.options).forEach(function(opt) {
-                    const isSelected = sid !== '' && String(opt.value) === sid;
-                    const extra = [];
-                    if (opt.dataset.stock !== undefined) extra.push('data-stock="' + opt.dataset.stock + '"');
-                    if (opt.dataset.uom !== undefined) extra.push('data-uom="' + opt.dataset.uom + '"');
-                    if (opt.dataset.code !== undefined) extra.push('data-code="' + opt.dataset.code + '"');
-                    html += '<option value="' + opt.value + '" ' + extra.join(' ') + (isSelected ? ' selected' : '') +
-                        '>' + opt.text + '</option>';
-                });
-                return html;
-            }
-
-            function buildBomRow(bi, idx, pkgCode) {
-                const div = document.createElement('div');
-                div.className = 'item-row card mb-2 border-left-primary';
-                div.dataset.pkg = pkgCode || '';
-                div.innerHTML = `
-                <div class="card-body py-2">
-                    <div class="row align-items-center">
-                        <div class="col-md-4">
-                            <div class="form-group mb-0">
-                                <label><strong>Item</strong></label>
-                                <select name="items[${idx}][item_id]" class="form-control item-select">
-                                    ${buildItemOptions(bi.item_id)}
-                                </select>
-                                <small class="form-text text-muted item-stock">Stock: ${bi.stock} ${bi.uom_code}</small>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group mb-0">
-                                <label><strong>Demand Qty</strong></label>
-                                <div class="input-group">
-                                    <input type="number" name="items[${idx}][demand_quantity]" class="form-control qty"
-                                        step="0.01" min="0.01" value="${bi.quantity}">
-                                    <div class="input-group-append"><span class="input-group-text uom-display">${bi.uom_code}</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-group mb-0">
-                                <label><strong>Remark</strong></label>
-                                <input type="text" name="items[${idx}][remark]" class="form-control" placeholder="e.g., Bundling HRM, WIP 39780">
-                            </div>
-                        </div>
-                        <div class="col-md-2 mt-3">
-                            <button type="button" class="btn btn-danger btn-sm remove-item"><i class="fas fa-trash"></i> Remove</button>
-                        </div>
-                    </div>
-                </div>`;
-                return div;
-            }
-
-            /** Append BOM items to the items container, tagged with pkgCode */
-            function appendBomItems(bom, pkgCode) {
-                try {
-                    const container = document.getElementById('items-container');
-                    if (!container) {
-                        console.error('items-container not found');
-                        return;
-                    }
-
-                    console.log('Appending BOM items:', bom.length, 'items for package:', pkgCode);
-
-                    // Remove the empty placeholder row if present and there are real BOM items
-                    if (bom.length > 0) {
-                        const empties = container.querySelectorAll('.item-row[data-pkg=""]');
-                        if (empties.length === 1 && !empties[0].querySelector('select.item-select')?.value) {
-                            empties[0].remove();
-                        }
-                    }
-
-                    // Use DocumentFragment for better performance
-                    const fragment = document.createDocumentFragment();
-                    bom.forEach(bi => {
-                        fragment.appendChild(buildBomRow(bi, itemIndex, pkgCode));
-                        itemIndex++;
-                    });
-                    container.appendChild(fragment);
-                    attachItemListeners();
-
-                    // Defer select2 initialization to prevent freezing
-                    if (initItemSelect2Timer) clearTimeout(initItemSelect2Timer);
-                    initItemSelect2Timer = setTimeout(() => {
-                        if (typeof initItemSelect2 === 'function') {
-                            initItemSelect2();
-                        }
-                    }, 150);
-                } catch (e) {
-                    console.error('Error in appendBomItems:', e);
-                }
-            }
-
-            /** Remove BOM rows that were added for the given pkgCode and renumber */
-            function removeBomItemsByPkg(pkgCode) {
-                document.querySelectorAll(`.item-row[data-pkg="${pkgCode}"]`).forEach(r => r.remove());
-                renumberItemRows();
-            }
-
-            function renumberItemRows() {
-                document.querySelectorAll('.item-row').forEach((row, i) => {
-                    row.querySelectorAll('[name^="items["]').forEach(el => {
-                        el.name = el.name.replace(/^items\[\d+\]/, `items[${i}]`);
-                    });
-                });
-                itemIndex = document.querySelectorAll('.item-row').length;
-            }
-
-            document.getElementById('add-item').addEventListener('click', function() {
-                const container = document.getElementById('items-container');
+            // ===== PANEL ROWS =====
+            const addPanelBtn = document.getElementById('add-panel');
+            if (addPanelBtn) addPanelBtn.addEventListener('click', function() {
+                const container = document.getElementById('panels-container');
                 const newRow = document.createElement('div');
-                newRow.className = 'item-row card mb-2 border-left-primary';
-                newRow.dataset.pkg = '';
+                newRow.className = 'panel-row card mb-2 border-left-success';
                 newRow.innerHTML = `
                 <div class="card-body py-2">
-                    <div class="row align-items-center">
-                        <div class="col-md-4">
-                            <div class="form-group mb-0">
-                                <label><strong>Item</strong></label>
-                                <select name="items[${itemIndex}][item_id]" class="form-control item-select">
-                                    ${buildItemOptions()}
-                                </select>
-                                <small class="form-text text-muted item-stock"></small>
-                            </div>
+                    <div class="form-group mb-1">
+                        <label class="mb-1"><strong>Panel</strong></label>
+                        <select name="panels[${panelIndex}][panel_id]" class="form-control form-control-sm panel-select">
+                            <option value="">-- Pilih Panel --</option>
+                            @foreach ($masterPanels as $mp)
+                                <option value="{{ $mp->id }}"
+                                    data-price="{{ $mp->price }}"
+                                    data-p0300="{{ $mp->price_0_300 }}"
+                                    data-p300500="{{ $mp->price_300_500 }}"
+                                    data-p500800="{{ $mp->price_500_800 }}"
+                                    data-p8002000="{{ $mp->price_800_2000 }}">{{ $mp->panel_code }} — {{ $mp->description }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Qty</strong></label>
+                            <input type="number" name="panels[${panelIndex}][qty]" class="form-control form-control-sm panel-qty" step="1" min="1" value="1">
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group mb-0">
-                                <label><strong>Demand Qty</strong></label>
-                                <div class="input-group">
-                                    <input type="number" name="items[${itemIndex}][demand_quantity]" class="form-control qty" step="0.01" min="0.01" placeholder="0.00">
-                                    <div class="input-group-append"><span class="input-group-text uom-display">-</span></div>
-                                </div>
-                            </div>
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Rate</strong></label>
+                            <input type="number" class="form-control form-control-sm panel-rate" readonly>
                         </div>
-                        <div class="col-md-4">
-                            <div class="form-group mb-0">
-                                <label><strong>Remark</strong></label>
-                                <input type="text" name="items[${itemIndex}][remark]" class="form-control" placeholder="e.g., Bundling HRM, WIP 39780">
-                            </div>
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Total</strong></label>
+                            <input type="text" class="form-control form-control-sm panel-total-display" readonly>
                         </div>
-                        <div class="col-md-2 mt-3">
-                            <button type="button" class="btn btn-danger btn-sm remove-item"><i class="fas fa-trash"></i> Remove</button>
-                        </div>
+                    </div>
+                    <div class="text-right mt-1">
+                        <button type="button" class="btn btn-danger btn-xs remove-panel"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
                 container.appendChild(newRow);
-                itemIndex++;
-                attachItemListeners();
-                initItemSelect2();
+                panelIndex++;
+                attachPanelListeners();
+                if (typeof initPanelSelect2 === 'function') initPanelSelect2();
             });
-            document.getElementById('add-labor').addEventListener('click', function() {
+
+            // ===== LABOR ROWS =====
+            const addLaborBtn = document.getElementById('add-labor');
+            if (addLaborBtn) addLaborBtn.addEventListener('click', function() {
                 const container = document.getElementById('labors-container');
                 const newRow = document.createElement('div');
-                newRow.className = 'labor-row card mb-2 border-left-success';
+                newRow.className = 'labor-row card mb-2 border-left-info';
                 newRow.innerHTML = `
                 <div class="card-body py-2">
-                    <div class="row align-items-end">
-                        <div class="col-md-6">
-                            <div class="form-group mb-0">
-                                <label><strong>Labor Description</strong></label>
-                                <input type="text" name="labors[${laborIndex}][description]" class="form-control labor-description" placeholder="Enter labor description">
-                            </div>
+                    <div class="form-group mb-1">
+                        <label class="mb-1"><strong>Labor</strong></label>
+                        <select name="labors[${laborIndex}][labor_id]" class="form-control form-control-sm labor-select">
+                            <option value="">-- Pilih Labor --</option>
+                            @foreach ($masterLabors as $ml)
+                                <option value="{{ $ml->id }}"
+                                    data-price="{{ $ml->price }}"
+                                    data-p0300="{{ $ml->price_0_300 }}"
+                                    data-p300500="{{ $ml->price_300_500 }}"
+                                    data-p500800="{{ $ml->price_500_800 }}"
+                                    data-p8002000="{{ $ml->price_800_2000 }}">{{ $ml->labor_code }} — {{ $ml->description }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Qty</strong></label>
+                            <input type="number" name="labors[${laborIndex}][qty]" class="form-control form-control-sm labor-qty" step="1" min="1" value="1">
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group mb-0">
-                                <label><strong>Qty</strong></label>
-                                <input type="number" name="labors[${laborIndex}][qty]" class="form-control labor-qty" step="1" min="1" value="1">
-                            </div>
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Rate</strong></label>
+                            <input type="number" class="form-control form-control-sm labor-rate" readonly>
                         </div>
-                        <div class="col-md-3">
-                            <div class="form-group mb-0">
-                                <label><strong>Remarks</strong></label>
-                                <input type="text" name="labors[${laborIndex}][remarks]" class="form-control" placeholder="Optional notes">
-                            </div>
+                        <div class="col-4">
+                            <label class="mb-1 small"><strong>Total</strong></label>
+                            <input type="text" class="form-control form-control-sm labor-total-display" readonly>
                         </div>
-                        <div class="col-md-1">
-                            <button type="button" class="btn btn-danger btn-sm remove-labor"><i class="fas fa-trash"></i></button>
-                        </div>
+                    </div>
+                    <div class="text-right mt-1">
+                        <button type="button" class="btn btn-danger btn-xs remove-labor"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
                 container.appendChild(newRow);
                 laborIndex++;
                 attachLaborListeners();
+                if (typeof initLaborSelect2 === 'function') initLaborSelect2();
             });
-
-            // ===== ITEM SELECT LISTENERS =====
-            function attachItemListeners() {
-                document.querySelectorAll('.item-select').forEach(select => {
-                    select.onchange = function() {
-                        const row = this.closest('.item-row');
-                        const opt = this.options[this.selectedIndex];
-                        row.querySelector('.item-stock').textContent = opt.value ?
-                            `Stock: ${opt.dataset.stock} ${opt.dataset.uom}` : '';
-                        row.querySelector('.uom-display').textContent = opt.dataset.uom || '-';
-                    };
-                });
-            }
 
             // ===== REMOVE BUTTONS =====
             document.addEventListener('click', function(e) {
-                if (e.target.closest('.remove-item')) {
-                    const row = e.target.closest('.item-row');
-                    if (row) {
-                        row.remove();
-                        renumberItemRows();
-                    }
+                if (e.target.closest('.remove-panel')) {
+                    if (document.querySelectorAll('.panel-row').length > 1)
+                        e.target.closest('.panel-row').remove();
+                    updatePriceDisplay();
                 }
                 if (e.target.closest('.remove-labor')) {
                     if (document.querySelectorAll('.labor-row').length > 1)
                         e.target.closest('.labor-row').remove();
+                    updatePriceDisplay();
                 }
             });
 
-            attachItemListeners();
+            // ===== ROW LISTENERS =====
+            function attachPanelListeners() {
+                document.querySelectorAll('.panel-select').forEach(select => {
+                    if (select.dataset.hasListener) return;
+                    select.dataset.hasListener = '1';
+                    select.onchange = function() {
+                        updatePriceDisplay();
+                    };
+                });
+            }
 
-            // ===== LABOR FUNCTIONS =====
-            function attachLaborListeners() {}
+            function attachLaborListeners() {
+                document.querySelectorAll('.labor-select').forEach(select => {
+                    if (select.dataset.hasListener) return;
+                    select.dataset.hasListener = '1';
+                    select.onchange = function() {
+                        updatePriceDisplay();
+                    };
+                });
+            }
 
+            // Event delegation for qty — covers both static and dynamically added rows
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('panel-qty') || e.target.classList.contains('labor-qty')) {
+                    updatePriceDisplay();
+                }
+            });
+
+            attachPanelListeners();
             attachLaborListeners();
 
             // ===== STRIP BLANK ROWS BEFORE SUBMIT =====
             document.querySelector('form').addEventListener('submit', function() {
-                // Remove labor rows with no description entered
-                document.querySelectorAll('.labor-row').forEach(function(row) {
-                    const desc = row.querySelector('.labor-description');
-                    if (!desc || !desc.value.trim()) {
-                        row.remove();
-                    }
+                document.querySelectorAll('.panel-row').forEach(function(row) {
+                    const sel = row.querySelector('.panel-select');
+                    if (!sel || !sel.value) row.remove();
                 });
-                // Remove item rows with no item selected
-                document.querySelectorAll('.item-row').forEach(function(row) {
-                    const sel = row.querySelector('select[name*="[item_id]"]');
-                    if (!sel || !sel.value) {
-                        row.remove();
-                    }
+                document.querySelectorAll('.labor-row').forEach(function(row) {
+                    const sel = row.querySelector('.labor-select');
+                    if (!sel || !sel.value) row.remove();
                 });
             });
 
@@ -993,29 +655,6 @@
             $(document).ready(function() {
                 updateVehiclePicker();
                 toggleRefWo();
-                $('#paket_select').select2({
-                    placeholder: '-- Pilih Paket --',
-                    allowClear: true,
-                    theme: 'bootstrap4',
-                    width: '100%',
-                    dropdownAutoWidth: true
-                }).on('select2:select', function() {
-                    console.log('[SELECT2] Package selected:', this.value);
-                    handlePackageChange.call(this);
-                });
-
-                // Initialize Size select with Select2
-                $('#size_select').select2({
-                    placeholder: '-- Pilih Ukuran --',
-                    allowClear: true,
-                    theme: 'bootstrap4',
-                    width: '100%',
-                    dropdownAutoWidth: true
-                }).on('select2:select', function() {
-                    console.log('[SELECT2] Size selected:', this.value);
-                    handleSizeChange.call(this);
-                });
-
                 $('#reference_wo_id').select2({
                     placeholder: '-- Select Reference WO --',
                     allowClear: true,
@@ -1066,7 +705,45 @@
                     requestAnimationFrame(processBatch);
                 }
             }
-            initItemSelect2();
-            initLaborSelect2();
+
+            function initPanelSelect2() {
+                $('.panel-select').not('.select2-hidden-accessible').each(function() {
+                    const savedVal = $(this).val();
+                    $(this).select2({
+                        theme: 'bootstrap4',
+                        placeholder: '-- Pilih Panel --',
+                        allowClear: true,
+                        width: '100%'
+                    }).on('change', function() {
+                        updatePriceDisplay();
+                    });
+                    if (savedVal) {
+                        $(this).val(savedVal).trigger('change');
+                    }
+                });
+            }
+
+            function initLaborSelect2() {
+                $('.labor-select').not('.select2-hidden-accessible').each(function() {
+                    const savedVal = $(this).val();
+                    $(this).select2({
+                        theme: 'bootstrap4',
+                        placeholder: '-- Pilih Labor --',
+                        allowClear: true,
+                        width: '100%'
+                    }).on('change', function() {
+                        updatePriceDisplay();
+                    });
+                    if (savedVal) {
+                        $(this).val(savedVal).trigger('change');
+                    }
+                });
+            }
+
+            $(document).ready(function() {
+                initItemSelect2();
+                initPanelSelect2();
+                initLaborSelect2();
+            });
         </script>
     @endsection

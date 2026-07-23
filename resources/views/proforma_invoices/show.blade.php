@@ -39,14 +39,6 @@
                 </div>
 
                 <div class="card-body">
-                    @foreach (['success', 'error', 'info'] as $type)
-                        @if (session($type))
-                            <div class="alert alert-{{ $type === 'error' ? 'danger' : $type }} alert-dismissible">
-                                {{ session($type) }}
-                                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                            </div>
-                        @endif
-                    @endforeach
 
                     {{-- Basic Info --}}
                     <table class="table table-bordered table-sm mb-4">
@@ -87,7 +79,7 @@
                                 $linePending = $line->isPendingMyApproval($authUser->id);
                                 $lb = $line->getStatusBadge();
                                 $typeLabels = [
-                                    'package' => 'Package',
+                                    'package' => 'Panel',
                                     'extra_item' => 'Extra Item',
                                     'extra_labor' => 'Extra Labor',
                                 ];
