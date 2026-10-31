@@ -63,11 +63,12 @@
                         @endif
                     </form>
 
-                    <table class="table table-bordered table-striped">
+                    <table class="table table-bordered table-striped table-hover" id="invoiceTable">
                         <thead>
                             <tr>
                                 <th>Invoice #</th>
                                 <th>Customer</th>
+                                <th>Ditujukan Kepada</th>
                                 <th>Invoice Date</th>
                                 <th>Due Date</th>
                                 <th>Amount</th>
@@ -79,7 +80,8 @@
                             @foreach ($invoices as $invoice)
                                 <tr>
                                     <td><strong>{{ $invoice->invoice_number }}</strong></td>
-                                    <td>{{ $invoice->customer->name }}</td>
+                                    <td>{{ $invoice->workOrder?->customer?->name ?? '-' }}</td>
+                                    <td>{{ $invoice->workOrder?->billingCustomer?->name ?? $invoice->customer?->name ?? '-' }}</td>
                                     <td>{{ $invoice->invoice_date->format('M d, Y') }}</td>
                                     <td>{{ $invoice->due_date?->format('M d, Y') ?? '-' }}</td>
                                     <td><strong>Rp {{ number_format($invoice->grand_total, 0, ',', '.') }}</strong></td>
@@ -170,6 +172,17 @@
                 $(this).find('#cancelModalLabel').text('Cancel Invoice ' + number);
                 $(this).find('#cancelForm').attr('action', url);
                 $(this).find('#cancellation_reason_idx').val('');
+            });
+        </script>
+    @endpush
+
+    @push('scripts')
+        <script>
+            $(function() {
+                $('#invoiceTable').DataTable({
+                    order: [[3, 'desc']],
+                    pageLength: 25,
+                });
             });
         </script>
     @endpush

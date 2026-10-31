@@ -180,7 +180,7 @@
                                                     </div>
                                                 </div>
                                             @endif
-                                        @elseif(in_array($pr->status, ['completed', 'printed']))
+                                        @elseif(in_array($pr->status, ['completed', 'printed']) && !$pr->isFullyOrdered())
                                             @if (auth()->user()->hasAnyRole(['purchasing']))
                                                 <a href="{{ route('purchase_orders.create', ['pr_id' => $pr->id]) }}"
                                                     class="btn btn-success btn-sm" title="Create PO">

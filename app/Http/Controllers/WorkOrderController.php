@@ -13,6 +13,7 @@ use App\Models\Item;
 use App\Models\ItemUOM;
 use App\Models\Labor;
 use App\Models\Package;
+use App\Models\Panel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -39,11 +40,7 @@ class WorkOrderController extends Controller
             }])
             ->get();
         $items = Item::where('is_active', true)->with(['itemUoms.uom', 'smallestUom', 'stocks'])->get();
-        $packagesFromDb = Package::with(['activeSizes', 'bomItems.item.smallestUom', 'bomItems.uom', 'bomItems.item.stocks'])
-            ->where('is_active', true)
-            ->orderBy('category')
-            ->orderBy('code')
-            ->get();
+        $packages = $this->packageOptions();
 
         $completedWos = WorkOrder::where('status', 'completed')
             ->orWhere('status', 'invoiced')
@@ -51,40 +48,10 @@ class WorkOrderController extends Controller
             ->orderBy('work_date', 'desc')
             ->get(['id', 'wo_number', 'customer_id', 'paket_name', 'work_date']);
 
-        // Transform for view
-        $packages = [];
-        foreach ($packagesFromDb as $pkg) {
-            if (!isset($packages[$pkg->category])) {
-                $packages[$pkg->category] = [];
-            }
-            $sizes = [];
-            foreach ($pkg->activeSizes as $size) {
-                $sizes[$size->size_name] = $size->price;
-            }
-            $bom = [];
-            foreach ($pkg->bomItems as $bi) {
-                $stock = (float) ($bi->item->stocks->sum('quantity') ?? 0);
-                $stockFormatted = $stock == floor($stock) ? number_format($stock, 0, '', '') : rtrim(rtrim(number_format($stock, 2, '.', ''), '0'), '.');
-                $bom[] = [
-                    'item_id'   => $bi->item_id,
-                    'item_code' => $bi->item->code ?? '',
-                    'item_name' => $bi->item->name ?? '',
-                    'uom_id'    => $bi->uom_id,
-                    'uom_code'  => $bi->uom->code ?? '',
-                    'quantity'  => (float) $bi->quantity,
-                    'stock'     => $stockFormatted,
-                ];
-            }
-            $packages[$pkg->category][$pkg->code] = [
-                'name'  => $pkg->name,
-                'sizes' => $sizes,
-                'bom'   => $bom,
-            ];
-        }
-
         $masterLabors = Labor::where('is_active', true)->orderBy('labor_code')->get();
+        $masterPanels = Panel::where('is_active', true)->orderBy('panel_code')->get();
 
-        return view('work_orders.create', compact('customers', 'items', 'packages', 'completedWos', 'masterLabors'));
+        return view('work_orders.create', compact('customers', 'items', 'packages', 'completedWos', 'masterLabors', 'masterPanels'));
     }
 
     /**
@@ -121,6 +88,55 @@ class WorkOrderController extends Controller
                 'BONUS-BP' => ['name' => 'Coating Bonus Body Repair', 'sizes' => ['All' => 1300000]],
             ],
         ];
+    }
+
+    /**
+     * Build the package options array used by the create/edit views.
+     * Each package carries its active sizes and its BOM so the views can
+     * auto-populate the Materials list when a package is selected.
+     */
+    private function packageOptions(): array
+    {
+        $packagesFromDb = Package::with(['activeSizes', 'bomItems.item.smallestUom', 'bomItems.uom', 'bomItems.item.stocks'])
+            ->where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('code')
+            ->get();
+
+        $packages = [];
+        foreach ($packagesFromDb as $pkg) {
+            if (!isset($packages[$pkg->category])) {
+                $packages[$pkg->category] = [];
+            }
+            $sizes = [];
+            foreach ($pkg->activeSizes as $size) {
+                $sizes[$size->size_name] = $size->price;
+            }
+            $bom = [];
+            foreach ($pkg->bomItems as $bi) {
+                if (!$bi->item) {
+                    continue;
+                }
+                $stock = (float) ($bi->item->stocks->sum('quantity') ?? 0);
+                $stockFormatted = $stock == floor($stock) ? number_format($stock, 0, '', '') : rtrim(rtrim(number_format($stock, 2, '.', ''), '0'), '.');
+                $bom[] = [
+                    'item_id'   => $bi->item_id,
+                    'item_code' => $bi->item->code ?? '',
+                    'item_name' => $bi->item->name ?? '',
+                    'uom_id'    => $bi->uom_id,
+                    'uom_code'  => $bi->uom->code ?? '',
+                    'quantity'  => (float) $bi->quantity,
+                    'stock'     => $stockFormatted,
+                ];
+            }
+            $packages[$pkg->category][$pkg->code] = [
+                'name'  => $pkg->name,
+                'sizes' => $sizes,
+                'bom'   => $bom,
+            ];
+        }
+
+        return $packages;
     }
 
     public function store(Request $request)
@@ -288,28 +304,7 @@ class WorkOrderController extends Controller
             $q->where('is_active', true)->orWhereIn('id', $woItemIds);
         })->with(['itemUoms.uom', 'smallestUom', 'stocks'])->get();
 
-        // Load packages from database
-        $packagesFromDb = Package::with('activeSizes')
-            ->where('is_active', true)
-            ->orderBy('category')
-            ->orderBy('code')
-            ->get();
-
-        // Transform for view
-        $packages = [];
-        foreach ($packagesFromDb as $pkg) {
-            if (!isset($packages[$pkg->category])) {
-                $packages[$pkg->category] = [];
-            }
-            $sizes = [];
-            foreach ($pkg->activeSizes as $size) {
-                $sizes[$size->size_name] = $size->price;
-            }
-            $packages[$pkg->category][$pkg->code] = [
-                'name' => $pkg->name,
-                'sizes' => $sizes
-            ];
-        }
+        $packages = $this->packageOptions();
 
         $completedWos = WorkOrder::whereIn('status', ['completed', 'invoiced'])
             ->with('customer')
@@ -317,8 +312,9 @@ class WorkOrderController extends Controller
             ->get(['id', 'wo_number', 'customer_id', 'paket_name', 'work_date']);
 
         $masterLabors = Labor::where('is_active', true)->orderBy('labor_code')->get();
+        $masterPanels = Panel::where('is_active', true)->orderBy('panel_code')->get();
 
-        return view('work_orders.edit', compact('workOrder', 'customers', 'items', 'packages', 'completedWos', 'masterLabors'));
+        return view('work_orders.edit', compact('workOrder', 'customers', 'items', 'packages', 'completedWos', 'masterLabors', 'masterPanels'));
     }
 
     public function update(Request $request, WorkOrder $workOrder)
@@ -450,6 +446,30 @@ class WorkOrderController extends Controller
 
         return redirect()->route('work_orders.show', $workOrder)
             ->with('success', 'Work Order updated successfully!');
+    }
+
+    public function updateDownPayment(Request $request, WorkOrder $workOrder)
+    {
+        if (!auth()->user()?->hasAnyRole(['finance', 'admin', 'super_admin'])) {
+            return redirect()->route('work_orders.show', $workOrder)
+                ->with('error', 'Only Finance can update the down payment.');
+        }
+
+        if (!in_array($workOrder->status, ['on_progress', 'in_progress'])) {
+            return redirect()->route('work_orders.show', $workOrder)
+                ->with('error', 'Down payment can only be changed while the Work Order is in progress.');
+        }
+
+        $request->validate([
+            'down_payment' => 'nullable|numeric|min:0',
+        ]);
+
+        $workOrder->update([
+            'down_payment' => $request->down_payment ?? 0,
+        ]);
+
+        return redirect()->route('work_orders.show', $workOrder)
+            ->with('success', 'Down payment updated.');
     }
 
     public function printView(WorkOrder $workOrder)

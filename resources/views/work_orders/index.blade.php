@@ -20,7 +20,7 @@
 
                 <div class="card-body">
 
-                    <table class="table table-bordered table-striped">
+                    <table id="workOrdersTable" class="table table-bordered table-striped">
                         <thead>
                             <tr>
                                 <th>WO Number</th>
@@ -82,4 +82,15 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            $(function() {
+                $('#workOrdersTable').DataTable({
+                    order: [[0, 'desc']],
+                    pageLength: 25,
+                });
+            });
+        </script>
+    @endpush
 @endsection

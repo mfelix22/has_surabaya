@@ -46,6 +46,14 @@
                                 </button>
                             </form>
                         @endif
+                        @if (
+                            $bonOut->status === 'completed' &&
+                                auth()->user()->hasAnyRole(['warehouse', 'admin', 'super_admin']))
+                            <button type="button" class="btn btn-danger btn-sm" data-toggle="modal"
+                                data-target="#returnBonOutModal">
+                                <i class="fas fa-undo"></i> Return Bon Out
+                            </button>
+                        @endif
                         <a href="{{ route('bon_outs.index') }}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-arrow-left"></i> Back
                         </a>
@@ -81,6 +89,8 @@
                                             <span class="badge badge-secondary">On Progress</span>
                                         @elseif ($bonOut->status === 'completed')
                                             <span class="badge badge-success">Completed</span>
+                                        @elseif ($bonOut->status === 'returned')
+                                            <span class="badge badge-warning">Returned</span>
                                         @else
                                             <span class="badge badge-danger">Cancelled</span>
                                         @endif
@@ -102,6 +112,12 @@
                                     <th>Notes:</th>
                                     <td>{{ $bonOut->notes ?? '-' }}</td>
                                 </tr>
+                                @if ($bonOut->status === 'returned' && $bonOut->returned_remark)
+                                    <tr>
+                                        <th>Return Reason:</th>
+                                        <td>{{ $bonOut->returned_remark }}</td>
+                                    </tr>
+                                @endif
                             </table>
                         </div>
 
@@ -122,13 +138,9 @@
                                         <td>{{ $bonOut->workOrder->customer->name ?? '-' }}</td>
                                     </tr>
                                     <tr>
-                                        <th>Panels:</th>
-                                        <td>
-                                            @forelse ($bonOut->workOrder->panelLabors->where('is_extra', false) as $wl)
-                                                <span class="badge badge-secondary">{{ $wl->panel?->panel_code ?? $wl->description }}</span>
-                                            @empty
-                                                -
-                                            @endforelse
+                                        <th>Package:</th>
+                                        <td>{{ $bonOut->workOrder->paket_name ?? '-' }}
+                                            {{ $bonOut->workOrder->paket_size ? "({$bonOut->workOrder->paket_size})" : '' }}
                                         </td>
                                     </tr>
                                     <tr>
@@ -152,7 +164,7 @@
                                     <th>Created At:</th>
                                     <td>{{ $bonOut->created_at->format('d M Y H:i') }}</td>
                                 </tr>
-                                @if ($bonOut->status === 'completed')
+                                @if (in_array($bonOut->status, ['completed', 'returned']))
                                     <tr>
                                         <th>Completed By:</th>
                                         <td>{{ $bonOut->completer->name ?? '-' }}</td>
@@ -160,6 +172,16 @@
                                     <tr>
                                         <th>Completed At:</th>
                                         <td>{{ $bonOut->completed_at?->format('d M Y H:i') ?? '-' }}</td>
+                                    </tr>
+                                @endif
+                                @if ($bonOut->status === 'returned')
+                                    <tr>
+                                        <th>Returned By:</th>
+                                        <td>{{ $bonOut->returner->name ?? '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Returned At:</th>
+                                        <td>{{ $bonOut->returned_at?->format('d M Y H:i') ?? '-' }}</td>
                                     </tr>
                                 @endif
                             </table>
@@ -182,6 +204,11 @@
                                         Leftover returned to stock. Invoice generated.
                                     @endif
                                 </div>
+                            @elseif ($bonOut->status === 'returned')
+                                <div class="alert alert-warning py-2">
+                                    <i class="fas fa-undo"></i>
+                                    Bon Out returned. Stock has been restored to inventory.
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -192,15 +219,6 @@
                     @php
                         $hasExtraPricedItems =
                             $bonOut->items->whereNull('work_order_item_id')->where('unit_price', '>', 0)->count() > 0;
-                        $sectionLabels = [
-                            'A' => 'DEMPUL',
-                            'B' => 'CAT',
-                            'C' => 'VERNIS',
-                            'D' => 'POLES dan KEBERSIHAN AKHIR',
-                            'E' => 'SPAREPART',
-                        ];
-                        $grouped = $bonOut->items->groupBy(fn($i) => $i->bon_out_section ?? 'Unsorted');
-                        $sectionOrder = ['A', 'B', 'C', 'D', 'E', 'Unsorted'];
                     @endphp
                     @if ($hasExtraPricedItems && $bonOut->workOrder)
                         <div class="alert alert-info py-2">
@@ -214,100 +232,113 @@
                             @endif
                         </div>
                     @endif
-
-                    @php $grandQtyTotal = 0; @endphp
-                    @foreach ($sectionOrder as $sKey)
-                        @if (!isset($grouped[$sKey])) @continue @endif
-                        @php
-                            $sItems       = $grouped[$sKey];
-                            $sLabel       = isset($sectionLabels[$sKey]) ? $sKey . '. ' . $sectionLabels[$sKey] : 'Unsorted';
-                            $sQtyTotal    = 0;
-                        @endphp
-                        <div class="card mb-3">
-                            <div class="card-header py-2" style="background:#f0f4fa;">
-                                <strong>{{ $sLabel }}</strong>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered mb-0">
-                                        <thead class="thead-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Item</th>
-                                                @if ($bonOut->bon_out_type != 3)
-                                                    <th class="text-right">Demand Qty</th>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item</th>
+                                    @if ($bonOut->bon_out_type != 3)
+                                        <th class="text-right">Demand Qty</th>
+                                    @endif
+                                    <th class="text-right">{{ $bonOut->bon_out_type == 3 ? 'Quantity' : 'Actual Used' }}
+                                    </th>
+                                    @if ($bonOut->bon_out_type != 3)
+                                        <th class="text-right">Leftover Returned</th>
+                                        <th class="text-right">Selling Price</th>
+                                    @endif
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($bonOut->items as $bi)
+                                    @php
+                                        $uomCode = $bi->item->smallestUom->code ?? '-';
+                                        $demand = (float) $bi->demand_quantity;
+                                        $actual = (float) $bi->actual_quantity;
+                                        $leftover = max(0, $demand - $actual);
+                                        $isExtra = $bi->work_order_item_id === null && $bonOut->bon_out_type != 3;
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $loop->iteration }}</td>
+                                        <td>
+                                            <strong>[{{ $bi->item->code }}]</strong> {{ $bi->item->name }}
+                                            @if ($isExtra)
+                                                <span class="badge badge-secondary ml-1">Extra</span>
+                                            @endif
+                                        </td>
+                                        @if ($bonOut->bon_out_type != 3)
+                                            <td class="text-right">
+                                                {{ number_format($demand, 2) }} {{ $uomCode }}
+                                            </td>
+                                        @endif
+                                        <td
+                                            class="text-right {{ $bonOut->bon_out_type != 3 && $actual < $demand ? 'text-info' : '' }}">
+                                            {{ number_format($actual, 2) }} {{ $uomCode }}
+                                        </td>
+                                        @if ($bonOut->bon_out_type != 3)
+                                            <td
+                                                class="text-right {{ $leftover > 0 ? 'text-success font-weight-bold' : 'text-muted' }}">
+                                                {{ number_format($leftover, 2) }} {{ $uomCode }}
+                                            </td>
+                                            <td class="text-right">
+                                                @if ($isExtra && $bi->unit_price > 0)
+                                                    <span class="badge badge-success">Billed</span>
+                                                    Rp {{ number_format($bi->unit_price, 0, ',', '.') }}
+                                                    <br><small class="text-muted">Total: Rp
+                                                        {{ number_format($actual * $bi->unit_price, 0, ',', '.') }}</small>
+                                                @elseif ($isExtra)
+                                                    <span class="text-muted">Internal use</span>
+                                                @else
+                                                    <span class="text-muted">—</span>
                                                 @endif
-                                                <th class="text-right">{{ $bonOut->bon_out_type == 3 ? 'Qty' : 'Actual Used' }}</th>
-                                                @if ($bonOut->bon_out_type != 3)
-                                                    <th class="text-right">Leftover</th>
-                                                    <th class="text-right">Selling Price</th>
-                                                @endif
-                                                <th>Remark</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach ($sItems as $bi)
-                                                @php
-                                                    $uomCode  = $bi->item->smallestUom->code ?? '-';
-                                                    $demand   = (float) $bi->demand_quantity;
-                                                    $actual   = (float) $bi->actual_quantity;
-                                                    $leftover = max(0, $demand - $actual);
-                                                    $isExtra  = $bi->work_order_item_id === null && $bonOut->bon_out_type != 3;
-                                                    $sQtyTotal += $actual;
-                                                    $grandQtyTotal += $actual;
-                                                @endphp
-                                                <tr>
-                                                    <td>{{ $loop->iteration }}</td>
-                                                    <td>
-                                                        <strong>[{{ $bi->item->code }}]</strong> {{ $bi->item->name }}
-                                                        @if ($isExtra)
-                                                            <span class="badge badge-secondary ml-1">Extra</span>
-                                                        @endif
-                                                    </td>
-                                                    @if ($bonOut->bon_out_type != 3)
-                                                        <td class="text-right">{{ number_format($demand, 2) }} {{ $uomCode }}</td>
-                                                    @endif
-                                                    <td class="text-right {{ $bonOut->bon_out_type != 3 && $actual < $demand ? 'text-info' : '' }}">
-                                                        {{ number_format($actual, 2) }} {{ $uomCode }}
-                                                    </td>
-                                                    @if ($bonOut->bon_out_type != 3)
-                                                        <td class="text-right {{ $leftover > 0 ? 'text-success font-weight-bold' : 'text-muted' }}">
-                                                            {{ number_format($leftover, 2) }} {{ $uomCode }}
-                                                        </td>
-                                                        <td class="text-right">
-                                                            @if ($isExtra && $bi->unit_price > 0)
-                                                                <span class="badge badge-success">Billed</span>
-                                                                Rp {{ number_format($bi->unit_price, 0, ',', '.') }}
-                                                                <br><small class="text-muted">Total: Rp {{ number_format($actual * $bi->unit_price, 0, ',', '.') }}</small>
-                                                            @elseif ($isExtra)
-                                                                <span class="text-muted">Internal use</span>
-                                                            @else
-                                                                <span class="text-muted">—</span>
-                                                            @endif
-                                                        </td>
-                                                    @endif
-                                                    <td>{{ $bi->remark ?? '—' }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="bg-light font-weight-bold">
-                                                <td colspan="{{ $bonOut->bon_out_type == 3 ? 2 : 3 }}" class="text-right">
-                                                    Subtotal Section {{ $sKey }}
-                                                </td>
-                                                <td class="text-right">{{ number_format($sQtyTotal, 2) }} items</td>
-                                                @if ($bonOut->bon_out_type != 3)
-                                                    <td colspan="3"></td>
-                                                @endif
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
+                                            </td>
+                                        @endif
+                                        <td>{{ $bi->remark ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    {{-- Return Bon Out Modal --}}
+    @if (
+        $bonOut->status === 'completed' &&
+            auth()->user()->hasAnyRole(['warehouse', 'admin', 'super_admin']))
+        <div class="modal fade" id="returnBonOutModal" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <form action="{{ route('bon_outs.return', $bonOut) }}" method="POST">
+                        @csrf
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title"><i class="fas fa-undo"></i> Return Bon Out</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-info-circle"></i>
+                                Returning <strong>{{ $bonOut->bon_out_number }}</strong> will restore stock to inventory
+                                and remove any extra billed items from the linked Work Order.
+                            </div>
+                            <div class="form-group">
+                                <label for="returned_remark">Return Reason <span class="text-danger">*</span></label>
+                                <textarea name="returned_remark" id="returned_remark" class="form-control" rows="3"
+                                    placeholder="e.g., Wrong item taken, customer cancelled, excess quantity, etc." minlength="5" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-undo"></i> Confirm — Return Bon Out
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection

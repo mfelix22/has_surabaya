@@ -203,8 +203,13 @@
                                 <th>UOM</th>
                                 <th>Quantity Ordered</th>
                                 <th>Quantity Received</th>
+                                <th>Isi/Kemasan</th>
                                 <th>Variance</th>
                                 <th>In Smallest UOM</th>
+                                @if (auth()->user()->hasAnyRole(['accounting', 'super_admin']))
+                                    <th>Unit Price (PO)</th>
+                                    <th>Total (PO)</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -215,7 +220,9 @@
                                         ->itemUoms()
                                         ->where('uom_id', $receivableItem->uom_id)
                                         ->first();
-                                    $conversionFactor = $itemUom ? $itemUom->conversion_to_smallest : 1;
+                                    $conversionFactor = $receivableItem->conversion_to_smallest !== null
+                                        ? $receivableItem->conversion_to_smallest
+                                        : ($itemUom ? $itemUom->conversion_to_smallest : 1);
                                     $quantityInSmallest = $receivableItem->quantity_received * $conversionFactor;
                                 @endphp
                                 <tr>
@@ -223,6 +230,14 @@
                                     <td>{{ $receivableItem->uom->name }} ({{ $receivableItem->uom->code }})</td>
                                     <td>{{ number_format($receivableItem->quantity_ordered, 2) }}</td>
                                     <td><strong>{{ number_format($receivableItem->quantity_received, 2) }}</strong></td>
+                                    <td>
+                                        {{ number_format($conversionFactor, 6) }}
+                                        @if ($receivableItem->conversion_to_smallest !== null && $itemUom && (float) $receivableItem->conversion_to_smallest !== (float) $itemUom->conversion_to_smallest)
+                                            <span class="badge badge-warning" title="Different from Master Item conversion ({{ number_format($itemUom->conversion_to_smallest, 6) }})">
+                                                <i class="fas fa-exclamation-triangle"></i> Adjusted
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td>
                                         @if ($variance > 0)
                                             <span class="text-success">+{{ number_format($variance, 2) }}</span>
@@ -236,6 +251,18 @@
                                         {{ number_format($quantityInSmallest, 2) }}
                                         {{ $receivableItem->item->smallestUom->code }}
                                     </td>
+                                    @if (auth()->user()->hasAnyRole(['accounting', 'super_admin']))
+                                        @php
+                                            $poDetail = null;
+                                            if ($receivable->purchaseOrder && $receivable->purchaseOrder->details) {
+                                                $poDetail = $receivable->purchaseOrder->details->first(function ($d) use ($receivableItem) {
+                                                    return $d->item_id == $receivableItem->item_id && $d->uom_id == $receivableItem->uom_id;
+                                                });
+                                            }
+                                        @endphp
+                                        <td>{{ $poDetail ? number_format($poDetail->unit_price, 2) : '-' }}</td>
+                                        <td>{{ $poDetail ? number_format($poDetail->unit_price * $receivableItem->quantity_received, 2) : '-' }}</td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>

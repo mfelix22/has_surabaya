@@ -23,16 +23,18 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="invoice_date">Invoice Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="invoice_date" id="invoice_date" class="form-control"
-                                        value="{{ old('invoice_date', $invoice->invoice_date->format('Y-m-d')) }}" required>
+                                    <input type="text" name="invoice_date" id="invoice_date" class="form-control"
+                                        value="{{ old('invoice_date', $invoice->invoice_date->format('d/m/Y')) }}" required
+                                        placeholder="DD/MM/YYYY" maxlength="10">
                                 </div>
                             </div>
 
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="due_date">Due Date</label>
-                                    <input type="date" name="due_date" id="due_date" class="form-control"
-                                        value="{{ old('due_date', $invoice->due_date?->format('Y-m-d')) }}">
+                                    <input type="text" name="due_date" id="due_date" class="form-control"
+                                        value="{{ old('due_date', $invoice->due_date?->format('d/m/Y')) }}"
+                                        placeholder="DD/MM/YYYY" maxlength="10">
                                 </div>
                             </div>
                         </div>

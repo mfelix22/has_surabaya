@@ -102,19 +102,41 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-md-6">
-                <div class="form-group">
-                    <label>Harga Barang / Jasa (Rp)</label>
-                    <input type="number" name="vendors[{{ $index }}][harga_barang_jasa]" class="form-control"
-                        value="{{ old('vendors.' . $index . '.harga_barang_jasa') }}" placeholder="0" step="0.01"
-                        min="0">
-                </div>
+            <div class="col-md-12">
+                <label>Rincian Harga per Item <span class="text-danger">*</span></label>
+                <table class="table table-sm table-bordered mb-1">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Item</th>
+                            <th style="width:180px">Harga (Rp)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="vendor-price-body">
+                        <tr>
+                            <td colspan="2" class="text-muted text-center">Belum ada item untuk dibandingkan.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
+        </div>
+        <div class="row">
             <div class="col-md-6">
                 <div class="form-group">
                     <label>Ketentuan Lain-lain dari Calon Supplier</label>
                     <textarea name="vendors[{{ $index }}][ketentuan_lain]" class="form-control" rows="2"
                         placeholder="Ketentuan lain dari calon supplier...">{{ old('vendors.' . $index . '.ketentuan_lain') }}</textarea>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Subtotal</label>
+                    <input type="text" class="form-control vendor-subtotal" readonly placeholder="Rp 0">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Total Termasuk PPN 11%</label>
+                    <input type="text" class="form-control total-ppn" readonly placeholder="Rp 0">
                 </div>
             </div>
         </div>
@@ -129,13 +151,6 @@
                             Harga sudah termasuk PPN 11%
                         </label>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    <label>Total Termasuk PPN 11%</label>
-                    <input type="text" class="form-control total-ppn" readonly placeholder="Rp 0"
-                        value="Rp {{ old('vendors.' . $index . '.harga_barang_jasa') && old('vendors.' . $index . '.include_ppn', true) ? number_format((float) old('vendors.' . $index . '.harga_barang_jasa') * 1.11, 2, ',', '.') : '0,00' }}">
                 </div>
             </div>
         </div>

@@ -144,7 +144,8 @@
                     @forelse ($vehicle->workOrders as $wo)
                         @php
                             $woStatusClass = match ($wo->status) {
-                                'completed', 'invoiced' => 'success',
+                                'completed' => 'success',
+                                'invoiced' => 'info',
                                 'in_progress', 'on_progress' => 'warning',
                                 'cancelled' => 'danger',
                                 default => 'secondary',

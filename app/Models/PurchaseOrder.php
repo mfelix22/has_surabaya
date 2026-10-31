@@ -53,6 +53,9 @@ class PurchaseOrder extends Model
         'closed_by',
         'closed_at',
         'nomor_nota',
+        'berita_acara_path',
+        'berita_acara_uploaded_by',
+        'berita_acara_uploaded_at',
     ];
 
     protected $casts = [
@@ -66,6 +69,7 @@ class PurchaseOrder extends Model
         'invoice_recorded_at' => 'datetime',
         'printed_at' => 'datetime',
         'closed_at' => 'datetime',
+        'berita_acara_uploaded_at' => 'datetime',
     ];
 
     public function purchaseRequest(): BelongsTo

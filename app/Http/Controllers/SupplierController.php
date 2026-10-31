@@ -77,7 +77,17 @@ class SupplierController extends Controller
             $query->latest()->limit(10);
         }]);
 
-        return view('suppliers.show', compact('supplier'));
+        $purchaseHistory = \App\Models\PurchaseOrderDetail::query()
+            ->select('purchase_order_details.*')
+            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_details.purchase_order_id')
+            ->where('purchase_orders.supplier_id', $supplier->id)
+            ->with(['item', 'uom', 'purchaseOrder'])
+            ->orderByDesc('purchase_orders.order_date')
+            ->orderByDesc('purchase_order_details.id')
+            ->paginate(15, ['*'], 'history_page')
+            ->withQueryString();
+
+        return view('suppliers.show', compact('supplier', 'purchaseHistory'));
     }
 
     /**

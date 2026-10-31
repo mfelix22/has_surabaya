@@ -314,6 +314,34 @@
                                 </div>
                             </div>
                         </div>
+
+                        @if ($vendorComparison->items->isNotEmpty())
+                            @php $pricesByItem = $vendor->prices->keyBy('vendor_comparison_item_id'); @endphp
+                            <hr>
+                            <strong class="d-block mb-2">Rincian Harga per Item</strong>
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Item</th>
+                                        <th class="text-right" style="width:200px">Harga (Rp)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($vendorComparison->items as $item)
+                                        <tr>
+                                            <td>{{ $item->item_name }}
+                                                @if ($item->qty)
+                                                    <span class="text-muted small">({{ rtrim(rtrim(number_format($item->qty, 2, ',', '.'), '0'), ',') }} {{ $item->uom }})</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-right">
+                                                {{ isset($pricesByItem[$item->id]) && $pricesByItem[$item->id]->harga !== null ? 'Rp ' . number_format($pricesByItem[$item->id]->harga, 0, ',', '.') : '-' }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @endif
                     </div>
                 </div>
             @endforeach

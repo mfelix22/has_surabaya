@@ -217,7 +217,7 @@
                     <div class="col-md-5">
                         <div class="form-group mb-0">
                             <label class="small">Item</label>
-                            <select name="bom[${bomIndex}][item_id]" class="form-control form-control-sm">
+                            <select name="bom[${bomIndex}][item_id]" class="form-control form-control-sm select2-bom" style="width: 100%;">
                                 <option value="">Select Item</option>${itemOptions}
                             </select>
                         </div>
@@ -225,7 +225,7 @@
                     <div class="col-md-3">
                         <div class="form-group mb-0">
                             <label class="small">UOM</label>
-                            <select name="bom[${bomIndex}][uom_id]" class="form-control form-control-sm">
+                            <select name="bom[${bomIndex}][uom_id]" class="form-control form-control-sm select2-bom" style="width: 100%;">
                                 <option value="">Select UOM</option>${uomOptions}
                             </select>
                         </div>
@@ -245,6 +245,7 @@
                 </div>
             </div>`;
             container.appendChild(row);
+            initBomSelect2(row);
             bomIndex++;
         });
 
@@ -253,5 +254,35 @@
                 e.target.closest('.bom-row').remove();
             }
         });
+
+        function initBomSelect2(context) {
+            // Batch process select2 initialization to prevent freezing when
+            // there are many rows with large option lists (e.g. hundreds of items).
+            const selects = $(context).find('select.select2-bom').not('.select2-hidden-accessible').toArray();
+            let index = 0;
+
+            function processBatch() {
+                const batchSize = 5;
+                const end = Math.min(index + batchSize, selects.length);
+
+                for (let i = index; i < end; i++) {
+                    const $select = $(selects[i]);
+                    $select.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        dropdownAutoWidth: true
+                    });
+                }
+
+                index = end;
+                if (index < selects.length) {
+                    requestAnimationFrame(processBatch);
+                }
+            }
+
+            if (selects.length > 0) {
+                requestAnimationFrame(processBatch);
+            }
+        }
     </script>
 @endsection

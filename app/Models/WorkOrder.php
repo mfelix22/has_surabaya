@@ -35,6 +35,7 @@ class WorkOrder extends Model
         'labor_total',
         'material_total',
         'grand_total',
+        'down_payment',
         'notes',
         'sa_sales',
         'created_by',
@@ -48,6 +49,7 @@ class WorkOrder extends Model
         'labor_total'   => 'decimal:2',
         'material_total' => 'decimal:2',
         'grand_total'   => 'decimal:2',
+        'down_payment'  => 'decimal:2',
         'started_at'    => 'datetime',
         'completed_at'  => 'datetime',
     ];

@@ -130,31 +130,53 @@
                                             href="{{ route('work_orders.show', $invoice->workOrder) }}">{{ $invoice->workOrder->wo_number }}</a>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <th>Sales Name:</th>
+                                    <td>{{ $invoice->workOrder->sa_sales ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Plate No:</th>
+                                    <td>{{ $invoice->workOrder->vehicle_plate ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Paket Code:</th>
+                                    <td>{{ $invoice->workOrder->paket_code ?? '-' }}</td>
+                                </tr>
                             </table>
                         </div>
                     </div>
 
-
                     <hr>
-                    <h6>Panels</h6>
+                    <h6>Work Order Items</h6>
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>Code</th>
-                                <th>Description</th>
-                                <th>Qty</th>
-                                <th class="text-right">Total (Rp)</th>
-                                <th>Remarks</th>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($invoice->workOrder->panelLabors as $panel)
+                            @foreach ($invoice->workOrder->items as $item)
                                 <tr>
-                                    <td>{{ $panel->panel?->panel_code ?? '—' }}</td>
-                                    <td>{{ $panel->description }}</td>
-                                    <td>{{ rtrim(rtrim(number_format((float) ($panel->qty ?? 1), 2, '.', ''), '0'), '.') }}</td>
-                                    <td class="text-right">{{ $panel->total_price ? number_format($panel->total_price, 0, ',', '.') : '—' }}</td>
-                                    <td>{{ $panel->remarks ?? '-' }}</td>
+                                    <td>{{ $item->item->name }}</td>
+                                    <td>{{ number_format($item->actual_quantity ?? ($item->demand_quantity ?? 0), 2) }}
+                                        {{ $item->item->smallestUom->code }}</td>
+                                    <td>
+                                        @if (!is_null($item->unit_price) && (float) $item->unit_price > 0)
+                                            Rp {{ number_format($item->unit_price, 0, ',', '.') }}
+                                        @else
+                                            <span class="text-muted">Included in Paket</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if (!is_null($item->total_price) && (float) $item->total_price > 0)
+                                            Rp {{ number_format($item->total_price, 0, ',', '.') }}
+                                        @else
+                                            <span class="text-muted">Included in Paket</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -165,29 +187,24 @@
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>Code</th>
                                 <th>Description</th>
                                 <th>Qty</th>
-                                <th class="text-right">Total (Rp)</th>
                                 <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($invoice->workOrder->generalLabors as $labor)
+                            @foreach ($invoice->workOrder->labors as $labor)
                                 <tr>
-                                    <td>{{ $labor->labor?->labor_code ?? '—' }}</td>
                                     <td>{{ $labor->description }}</td>
-                                    <td>{{ rtrim(rtrim(number_format((float) ($labor->qty ?? 1), 2, '.', ''), '0'), '.') }}</td>
-                                    <td class="text-right">{{ $labor->total_price ? number_format($labor->total_price, 0, ',', '.') : '—' }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float) ($labor->qty ?? 1), 2, '.', ''), '0'), '.') }}
+                                    </td>
                                     <td>{{ $labor->remarks ?? '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                    @php $baseLabor = $invoice->workOrder->generalLabors->where('is_extra', false)->sum('total_price'); @endphp
-                    @if ($baseLabor > 0)
-                        <small class="text-muted">Base labor: Rp {{ number_format($baseLabor, 0, ',', '.') }} (included in total).</small>
-                    @endif
+                    <small class="text-muted">Labor fee is fixed at Rp 75.000 per paket and already included in
+                        total.</small>
 
                     <hr>
                     <div class="row">
@@ -208,7 +225,30 @@
                                     <th>Grand Total:</th>
                                     <td><strong>Rp {{ number_format($invoice->grand_total, 0, ',', '.') }}</strong></td>
                                 </tr>
+                                @php $downPayment = (float) ($invoice->workOrder->down_payment ?? 0); @endphp
+                                @if ($downPayment > 0)
+                                    <tr>
+                                        <th>Down Payment:</th>
+                                        <td><strong class="text-info">-Rp
+                                                {{ number_format($downPayment, 0, ',', '.') }}</strong></td>
+                                    </tr>
+                                    <tr style="border-top: 2px solid #dee2e6; font-size: 1.3em;">
+                                        <th>Remaining:</th>
+                                        <td><strong>Rp
+                                                {{ number_format(max(0, $invoice->grand_total - $downPayment), 0, ',', '.') }}</strong>
+                                        </td>
+                                    </tr>
+                                @endif
                             </table>
+                            @if ($invoice->status !== 'cancelled' && auth()->user()->hasAnyRole(['finance', 'admin', 'super_admin']))
+                                <div class="text-right">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal"
+                                        data-target="#downPaymentModal">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                        {{ $downPayment > 0 ? 'Edit' : 'Set' }} Down Payment
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -349,9 +389,7 @@
                                                 count($aggregatedItems) > 0
                                                     ? $totalItemCogs
                                                     : (float) ($invoice->cogm_material ?? 0);
-                                            $laborCogs = (float) ($invoice->cogm_labor ?? 0);
-                                            $totalCogs = $materialCogs + $laborCogs;
-                                            $grossProfit = ($invoice->grand_total ?? 0) - $totalCogs;
+                                            $grossProfit = ($invoice->grand_total ?? 0) - $materialCogs;
                                             $margin =
                                                 ($invoice->grand_total ?? 0) > 0
                                                     ? ($grossProfit / $invoice->grand_total) * 100
@@ -361,13 +399,9 @@
                                             <th width="50%">Materials Cost (COGS):</th>
                                             <td>Rp {{ number_format($materialCogs, 0, ',', '.') }}</td>
                                         </tr>
-                                        <tr>
-                                            <th>Labor Cost (COGS):</th>
-                                            <td>Rp {{ number_format($laborCogs, 0, ',', '.') }}</td>
-                                        </tr>
                                         <tr class="table-warning">
-                                            <th><strong>Total COGS:</strong></th>
-                                            <td><strong>Rp {{ number_format($totalCogs, 0, ',', '.') }}</strong></td>
+                                            <th><strong>Total COGS (Material Only):</strong></th>
+                                            <td><strong>Rp {{ number_format($materialCogs, 0, ',', '.') }}</strong></td>
                                         </tr>
                                         <tr>
                                             <th>Revenue (Grand Total):</th>
@@ -442,6 +476,46 @@
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                             <button type="submit" class="btn btn-primary">Save Change</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($invoice->status !== 'cancelled' && auth()->user()->hasAnyRole(['finance', 'admin', 'super_admin']))
+        <div class="modal fade" id="downPaymentModal" tabindex="-1" role="dialog"
+            aria-labelledby="downPaymentModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <form action="{{ route('invoices.downPayment', $invoice) }}" method="POST">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="downPaymentModalLabel">Down Payment</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted">
+                                Informational only &mdash; saved on the <strong>work order</strong> and deducted from the
+                                total shown on this page. It is not printed on the invoice.
+                            </p>
+                            <div class="form-group">
+                                <label for="down_payment">Down Payment Amount</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Rp</span>
+                                    </div>
+                                    <input type="number" name="down_payment" id="down_payment" class="form-control"
+                                        min="0" step="any" placeholder="0"
+                                        value="{{ $invoice->workOrder->down_payment ?? 0 }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
                         </div>
                     </form>
                 </div>

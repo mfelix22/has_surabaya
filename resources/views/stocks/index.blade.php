@@ -68,12 +68,18 @@
                     </div>
 
                     <table class="table table-bordered table-striped table-hover" id="stocks-table">
+                        @php
+                            $canViewCost = auth()->user() && auth()->user()->hasAnyRole(['accounting', 'director', 'viewer', 'super_admin']);
+                        @endphp
                         <thead>
                             <tr>
                                 <th>Item Code</th>
                                 <th>Item Name</th>
                                 <th>Item Type</th>
                                 <th>Current Stock</th>
+                                @if ($canViewCost)
+                                    <th>Unit Cost</th>
+                                @endif
                                 <th>Reorder Level</th>
                                 <th>Status</th>
                                 <th>Alternative UOMs</th>
@@ -99,6 +105,15 @@
                                             <span class="badge badge-warning ml-1">Low</span>
                                         @endif
                                     </td>
+                                    @if ($canViewCost)
+                                        <td data-order="{{ $stock->avg_cost }}">
+                                            @if ($stock->avg_cost > 0)
+                                                <span class="text-monospace">Rp {{ number_format($stock->avg_cost, 2) }}</span>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                     <td data-order="{{ $stock->item->reorder_level }}">
                                         {{ number_format($stock->item->reorder_level, 2) }}
                                         {{ $stock->item->smallestUom->code }}
@@ -215,7 +230,7 @@
                 ], // Sort by item name by default
                 columnDefs: [{
                         orderable: false,
-                        targets: [6]
+                        targets: [{{ $canViewCost ? 7 : 6 }}]
                     } // Disable sorting on Alternative UOMs column
                 ],
                 language: {
@@ -242,7 +257,7 @@
             // Status filter
             $('#status-filter').on('change', function() {
                 var value = $(this).val();
-                table.column(5).search(value).draw();
+                table.column({{ $canViewCost ? 6 : 5 }}).search(value).draw();
             });
         });
     </script>

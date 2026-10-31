@@ -366,22 +366,38 @@
     <div class="po-number">No : {{ $purchaseOrder->po_number }}</div>
 
     <!-- SUPPLIER SECTION -->
+    @php
+        $printSupplierName = $purchaseOrder->supplier_name ?? optional($purchaseOrder->supplier)->name ?? '-';
+        $printSupplierAddress = $purchaseOrder->supplier_address ?? optional($purchaseOrder->supplier)->address ?? '';
+        $printSupplierPhone = $purchaseOrder->supplier_phone ?? optional($purchaseOrder->supplier)->phone ?? '';
+        $printSupplierContact = $purchaseOrder->supplier_contact_person ?? optional($purchaseOrder->supplier)->contact_person ?? '';
+        $printPrNumber = optional($purchaseOrder->purchaseRequest)->pr_number ?? '-';
+        $printOrderDate = optional($purchaseOrder->order_date)->format('d F Y') ?? '-';
+    @endphp
     <table class="supplier-table">
         <tr>
             <td style="width:50%; vertical-align:top;">
                 <div style="font-weight:bold; margin-bottom:2px;">Kepada Yth.</div>
-                <div style="color:#000; font-weight:bold; margin-bottom:2px;">{{ $purchaseOrder->supplier_name }}
-                </div>
-                <div style="color:#000; margin-bottom:2px;">{{ $purchaseOrder->supplier_address ?? '' }}</div>
-                <div style="color:#000;">{{ $purchaseOrder->supplier_phone ?? '' }}</div>
+                <div style="color:#000; font-weight:bold; margin-bottom:2px;">{{ $printSupplierName }}</div>
+                @if ($printSupplierAddress)
+                    <div style="color:#000; margin-bottom:2px;">{{ $printSupplierAddress }}</div>
+                @endif
+                @if ($printSupplierPhone)
+                    <div style="color:#000; margin-bottom:2px;">{{ $printSupplierPhone }}</div>
+                @endif
+                @if ($printSupplierContact)
+                    <div style="color:#000; margin-bottom:2px;">Up. {{ $printSupplierContact }}</div>
+                @endif
             </td>
             <td style="width:50%; vertical-align:top;">
-                <div style="margin-bottom:3px;"><strong>
-                        Permintaan No
-                    </strong> <span class="red bold">:
-                        {{ $purchaseOrder->purchaseRequest->pr_number ?? '-' }}</span></div>
-                <div><strong>Date of Order</strong> <span class="red bold">:
-                        {{ $purchaseOrder->order_date->format('d F Y') }}</span></div>
+                <div style="margin-bottom:3px;"><strong>Permintaan No</strong> <span class="red bold">: {{ $printPrNumber }}</span></div>
+                <div style="margin-bottom:3px;"><strong>Date of Order</strong> <span class="red bold">: {{ $printOrderDate }}</span></div>
+                @if ($purchaseOrder->expected_delivery_date)
+                    <div style="margin-bottom:3px;"><strong>Expected Delivery</strong> <span class="red bold">: {{ optional($purchaseOrder->expected_delivery_date)->format('d F Y') ?? '-' }}</span></div>
+                @endif
+                @if ($purchaseOrder->notes)
+                    <div><strong>Notes</strong> <span class="red bold">: {{ $purchaseOrder->notes }}</span></div>
+                @endif
             </td>
         </tr>
     </table>

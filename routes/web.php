@@ -28,6 +28,9 @@ use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\SparepartReportController;
+use App\Http\Controllers\PackageCogsReportController;
+use App\Http\Controllers\BonInReportController;
+use App\Http\Controllers\MonthEndStockReportController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -139,8 +142,9 @@ Route::middleware('auth')->group(function () {
         Route::post('purchase-requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject'])->name('purchase_requests.reject');
         Route::post('purchase-requests/{purchaseRequest}/cancel', [PurchaseRequestController::class, 'cancel'])->name('purchase_requests.cancel');
         Route::post('purchase-requests/{purchaseRequest}/close', [PurchaseRequestController::class, 'close'])->name('purchase_requests.close');
-        Route::post('purchase-requests/{purchaseRequest}/upload-berita-acara', [PurchaseRequestController::class, 'uploadBeritaAcara'])->name('purchase_requests.upload_berita_acara');
+        Route::post('purchase-requests/{purchaseRequest}/revoke-approval', [PurchaseRequestController::class, 'revokeApproval'])->name('purchase_requests.revoke_approval');
         Route::get('purchase-requests/{purchaseRequest}/print', [PurchaseRequestController::class, 'print'])->name('purchase_requests.print')->middleware('signed');
+        Route::get('purchase-requests/{purchaseRequest}/print-preview', [PurchaseRequestController::class, 'printPreview'])->name('purchase_requests.print_preview')->middleware('signed');
         Route::get('purchase-requests/{purchaseRequest}/attachment', [PurchaseRequestController::class, 'attachment'])->name('purchase_requests.attachment');
     });
 
@@ -156,8 +160,10 @@ Route::middleware('auth')->group(function () {
     Route::post('purchase-orders/{purchaseOrder}/complete', [PurchaseOrderController::class, 'complete'])->name('purchase_orders.complete');
     Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase_orders.cancel');
     Route::post('purchase-orders/{purchaseOrder}/close-so', [PurchaseOrderController::class, 'closeSO'])->name('purchase_orders.close_so');
+    Route::post('purchase-orders/{purchaseOrder}/upload-berita-acara', [PurchaseOrderController::class, 'uploadBeritaAcara'])->name('purchase_orders.upload_berita_acara');
     Route::get('purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase_orders.print')->middleware('signed');
     Route::get('purchase-orders/{purchaseOrder}/print-preview', [PurchaseOrderController::class, 'printPreview'])->name('purchase_orders.print_preview');
+    Route::get('purchase-orders/{purchaseOrder}/print-bpp', [PurchaseOrderController::class, 'printBpp'])->name('purchase_orders.print_bpp');
 
     // Vendor Comparisons (FK-PCH)
     Route::resource('vendor-comparisons', VendorComparisonController::class)->names('vendor_comparisons');
@@ -181,6 +187,7 @@ Route::middleware('auth')->group(function () {
     Route::put('bon-outs/{bonOut}', [BonOutController::class, 'update'])->name('bon_outs.update');
     Route::post('bon-outs/{bonOut}/complete', [BonOutController::class, 'complete'])->name('bon_outs.complete');
     Route::post('bon-outs/{bonOut}/cancel', [BonOutController::class, 'cancel'])->name('bon_outs.cancel');
+    Route::post('bon-outs/{bonOut}/return', [BonOutController::class, 'returnItems'])->name('bon_outs.return');
     Route::get('bon-outs/{bonOut}/print', [BonOutController::class, 'print'])->name('bon_outs.print')->middleware('signed');
 
     // Work Orders
@@ -188,6 +195,7 @@ Route::middleware('auth')->group(function () {
     Route::post('work-orders/{workOrder}/start', [WorkOrderController::class, 'start'])->name('work_orders.start');
     Route::post('work-orders/{workOrder}/complete', [WorkOrderController::class, 'complete'])->name('work_orders.complete');
     Route::get('work-orders/{workOrder}/print', [WorkOrderController::class, 'printView'])->name('work_orders.print')->middleware('signed');
+    Route::post('work-orders/{workOrder}/down-payment', [WorkOrderController::class, 'updateDownPayment'])->name('work_orders.downPayment');
     Route::post('work-orders/{workOrder}/add-labor', [WorkOrderController::class, 'addLabor'])->name('work_orders.add_labor');
     Route::delete('work-orders/{workOrder}/labors/{labor}', [WorkOrderController::class, 'removeLabor'])->name('work_orders.remove_labor');
 
@@ -206,6 +214,7 @@ Route::middleware('auth')->group(function () {
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid'])->name('invoices.markAsPaid');
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
     Route::post('invoices/{invoice}/change-customer', [InvoiceController::class, 'changeCustomer'])->name('invoices.changeCustomer');
+    Route::post('invoices/{invoice}/down-payment', [InvoiceController::class, 'updateDownPayment'])->name('invoices.downPayment');
     Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print')->middleware('signed');
     Route::get('invoices/{invoice}/cogs-report', [InvoiceController::class, 'cogsReport'])->name('invoices.cogsReport');
 
@@ -217,6 +226,20 @@ Route::middleware('auth')->group(function () {
     // Sparepart Report
     Route::get('reports/sparepart', [SparepartReportController::class, 'index'])->name('reports.sparepart');
     Route::get('reports/sparepart/export', [SparepartReportController::class, 'export'])->name('reports.sparepart.export');
+
+    // COGS by Package Report
+    Route::get('reports/package-cogs', [PackageCogsReportController::class, 'index'])->name('reports.package_cogs');
+    Route::get('reports/package-cogs/export', [PackageCogsReportController::class, 'export'])->name('reports.package_cogs.export');
+
+    // Month-End Stock Cost Report
+    Route::get('reports/stock-month-end', [MonthEndStockReportController::class, 'index'])->name('reports.stock_month_end');
+    Route::get('reports/stock-month-end/print', [MonthEndStockReportController::class, 'print'])->name('reports.stock_month_end.print');
+    Route::get('reports/stock-month-end/export', [MonthEndStockReportController::class, 'export'])->name('reports.stock_month_end.export');
+
+    // Bon In Listing Report
+    Route::get('reports/bon-in', [BonInReportController::class, 'index'])->name('reports.bon_in');
+    Route::get('reports/bon-in/print', [BonInReportController::class, 'print'])->name('reports.bon_in.print');
+    Route::get('reports/bon-in/export', [BonInReportController::class, 'export'])->name('reports.bon_in.export');
 
     // Sales Orders
     Route::resource('sales-orders', SalesOrderController::class)->names('sales_orders');

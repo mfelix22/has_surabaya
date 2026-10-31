@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VendorComparisonVendor extends Model
 {
@@ -31,5 +32,10 @@ class VendorComparisonVendor extends Model
     public function comparison(): BelongsTo
     {
         return $this->belongsTo(VendorComparison::class, 'vendor_comparison_id');
+    }
+
+    public function prices(): HasMany
+    {
+        return $this->hasMany(VendorComparisonVendorPrice::class);
     }
 }

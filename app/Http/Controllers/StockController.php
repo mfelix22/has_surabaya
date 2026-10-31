@@ -157,6 +157,7 @@ class StockController extends Controller
             'quantity' => $newQuantity - $oldQuantity,
             'unit_cost' => (float) $stock->avg_cost,
             'balance_after' => $newQuantity,
+            'avg_cost_after' => (float) $stock->avg_cost,
             'location' => 'default',
             'reference_type' => 'Manual Adjustment',
             'reference_id' => null,
@@ -310,6 +311,10 @@ class StockController extends Controller
             ->orderBy('items.code')
             ->get();
 
+        $stocks = $stocks->sortBy(function ($stock) {
+            return ($stock->item->item_type_name ?? '') . '|' . ($stock->item->code ?? '');
+        })->values();
+
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Stock with Prices');
@@ -361,8 +366,37 @@ class StockController extends Controller
         $dataRow = 5;
         $no = 1;
         $totalStockValue = 0;
+        $totalQuantity = 0;
+        $currentType = null;
+        $typeTotalQuantity = 0;
+        $typeTotalStockValue = 0;
+        $lastDataRow = $dataRow;
 
         foreach ($stocks as $stock) {
+            $itemType = $stock->item->item_type_name;
+
+            if ($currentType !== $itemType) {
+                if ($currentType !== null) {
+                    $sheet->setCellValue('C' . $dataRow, 'Total ' . $currentType);
+                    $sheet->getStyle('C' . $dataRow)->getFont()->setBold(true);
+                    $sheet->getStyle('C' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->setCellValue('E' . $dataRow, (float) number_format($typeTotalQuantity, 2, '.', ''));
+                    $sheet->setCellValue('K' . $dataRow, (float) number_format($typeTotalStockValue, 2, '.', ''));
+                    $sheet->getStyle('E' . $dataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                    $sheet->getStyle('K' . $dataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                    $sheet->getStyle('E' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle('K' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle('C' . $dataRow . ':K' . $dataRow)->applyFromArray([
+                        'fill'    => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E7E6E6']],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
+                    ]);
+                    $dataRow++;
+                }
+                $currentType = $itemType;
+                $typeTotalQuantity = 0;
+                $typeTotalStockValue = 0;
+            }
+
             $isLow = $stock->quantity <= $stock->item->reorder_level && $stock->quantity > 0;
             $isOut = $stock->quantity <= 0;
 
@@ -371,11 +405,14 @@ class StockController extends Controller
             $sellingPrice = (float) ($stock->item->selling_price ?? 0);
             $stockValue  = $stock->quantity * $avgCost;
             $totalStockValue += $stockValue;
+            $totalQuantity += $stock->quantity;
+            $typeTotalQuantity += $stock->quantity;
+            $typeTotalStockValue += $stockValue;
 
             $sheet->setCellValue('A' . $dataRow, $no++);
             $sheet->setCellValue('B' . $dataRow, $stock->item->code);
             $sheet->setCellValue('C' . $dataRow, $stock->item->name);
-            $sheet->setCellValue('D' . $dataRow, $stock->item->item_type_name);
+            $sheet->setCellValue('D' . $dataRow, $itemType);
             $sheet->setCellValue('E' . $dataRow, (float) number_format($stock->quantity, 2, '.', ''));
             $sheet->setCellValue('F' . $dataRow, $stock->item->smallestUom->code);
             $sheet->setCellValue('G' . $dataRow, (float) number_format($stock->item->reorder_level, 2, '.', ''));
@@ -415,11 +452,45 @@ class StockController extends Controller
                 $sheet->getStyle('H' . $dataRow)->getFont()->setBold(true);
             }
 
+            $lastDataRow = $dataRow;
             $dataRow++;
         }
 
-        // Total row
-        $lastRow = $dataRow - 1;
+        // Final item type subtotal
+        if ($currentType !== null) {
+            $sheet->setCellValue('C' . $dataRow, 'Total ' . $currentType);
+            $sheet->getStyle('C' . $dataRow)->getFont()->setBold(true);
+            $sheet->getStyle('C' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->setCellValue('E' . $dataRow, (float) number_format($typeTotalQuantity, 2, '.', ''));
+            $sheet->setCellValue('K' . $dataRow, (float) number_format($typeTotalStockValue, 2, '.', ''));
+            $sheet->getStyle('E' . $dataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('K' . $dataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('E' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('K' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle('C' . $dataRow . ':K' . $dataRow)->applyFromArray([
+                'fill'    => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E7E6E6']],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
+            ]);
+            $dataRow++;
+        }
+
+        // Total rows
+        $lastRow = $lastDataRow;
+
+        // Total quantity
+        $sheet->setCellValue('J' . $dataRow, 'TOTAL QUANTITY:');
+        $sheet->getStyle('J' . $dataRow)->getFont()->setBold(true);
+        $sheet->getStyle('J' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->setCellValue('K' . $dataRow, (float) number_format($totalQuantity, 2, '.', ''));
+        $sheet->getStyle('K' . $dataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('K' . $dataRow)->getFont()->setBold(true);
+        $sheet->getStyle('J' . $dataRow . ':K' . $dataRow)->applyFromArray([
+            'fill'    => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9E8F5']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM]],
+        ]);
+        $dataRow++;
+
+        // Total stock value
         $sheet->setCellValue('J' . $dataRow, 'TOTAL STOCK VALUE:');
         $sheet->getStyle('J' . $dataRow)->getFont()->setBold(true);
         $sheet->getStyle('J' . $dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);

@@ -82,7 +82,27 @@ class PurchaseOrderDetail extends Model
 
     public function getRemainingBillableQuantity(): float
     {
-        return max(0, (float) $this->received_quantity - $this->getBilledQuantity());
+        $billed = $this->purchaseOrderInvoiceLines
+            ->filter(fn($line) => !optional($line->purchaseOrderInvoice)->is_prepayment)
+            ->sum('qty_billed');
+
+        return max(0, (float) $this->received_quantity - $billed);
+    }
+
+    /**
+     * Qty that can still be billed on a proforma/prepayment invoice
+     * (billed against ordered qty, independent of received qty).
+     */
+    public function getPrepaymentBilledQuantity(): float
+    {
+        return (float) $this->purchaseOrderInvoiceLines
+            ->filter(fn($line) => optional($line->purchaseOrderInvoice)->is_prepayment)
+            ->sum('qty_billed');
+    }
+
+    public function getRemainingPrepaymentQuantity(): float
+    {
+        return max(0, (float) $this->quantity - $this->getPrepaymentBilledQuantity());
     }
 
     public function getLineStatusAttribute(): string

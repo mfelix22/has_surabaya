@@ -24,13 +24,14 @@ class InvoiceController extends Controller
 
         $month = request('month');
         $year  = request('year');
-        $query = Invoice::with(['customer', 'workOrder', 'creator']);
+        $query = Invoice::with(['customer', 'workOrder.customer', 'workOrder.billingCustomer', 'creator']);
         if ($month) {
             $query->whereMonth('invoice_date', (int) $month);
         }
         if ($year) {
             $query->whereYear('invoice_date', (int) $year);
         }
+
         $invoices = $query->orderBy('invoice_date', 'desc')->get();
         // For filter dropdowns
         $allYears = Invoice::selectRaw('YEAR(invoice_date) as year')->distinct()->orderBy('year', 'desc')->pluck('year');
@@ -70,11 +71,17 @@ class InvoiceController extends Controller
 
         $validated = $request->validate([
             'work_order_id' => ['required', 'exists:work_orders,id', \Illuminate\Validation\Rule::unique('invoices')->where(fn($q) => $q->where('status', '!=', 'cancelled'))],
-            'invoice_date' => 'required|date',
-            'due_date' => 'nullable|date|after:invoice_date',
+            'invoice_date' => 'required|date_format:d/m/Y',
+            'due_date' => 'nullable|date_format:d/m/Y|after:invoice_date',
             'qq' => 'nullable|string|max:200',
             'notes' => 'nullable|string',
         ]);
+
+        // Convert DD/MM/YYYY inputs to YYYY-MM-DD for storage
+        $validated['invoice_date'] = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['invoice_date'])->format('Y-m-d');
+        if (!empty($validated['due_date'])) {
+            $validated['due_date'] = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['due_date'])->format('Y-m-d');
+        }
 
         // Wrap in a transaction and lock the WO row to prevent simultaneous proforma/invoice creation
         try {
@@ -249,13 +256,19 @@ class InvoiceController extends Controller
         }
 
         $validated = $request->validate([
-            'invoice_date' => 'required|date',
-            'due_date' => 'nullable|date|after:invoice_date',
+            'invoice_date' => 'required|date_format:d/m/Y',
+            'due_date' => 'nullable|date_format:d/m/Y|after:invoice_date',
             'discount_percentage' => 'required|numeric|min:0|max:100',
             'discount_amount' => 'required|numeric|min:0',
             'qq' => 'nullable|string|max:200',
             'notes' => 'nullable|string',
         ]);
+
+        // Convert DD/MM/YYYY inputs to YYYY-MM-DD for storage
+        $validated['invoice_date'] = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['invoice_date'])->format('Y-m-d');
+        if (!empty($validated['due_date'])) {
+            $validated['due_date'] = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['due_date'])->format('Y-m-d');
+        }
 
         $discountAmount = $validated['discount_amount'];
         $grandTotal = $invoice->subtotal - $discountAmount;
@@ -279,7 +292,7 @@ class InvoiceController extends Controller
             return PermissionHelper::denyAccess('invoices', 'view');
         }
 
-        $invoice->load(['customer', 'workOrder.labors', 'workOrder.proformaInvoice.discountLines', 'creator']);
+        $invoice->load(['customer', 'workOrder.customer', 'workOrder.billingCustomer', 'workOrder.labors', 'workOrder.proformaInvoice.discountLines', 'creator']);
         return view('invoices.print', compact('invoice'));
     }
 
@@ -395,6 +408,25 @@ class InvoiceController extends Controller
 
         return redirect()->route('invoices.show', $invoice)
             ->with('success', 'Customer updated on invoice and work order.');
+    }
+
+    public function updateDownPayment(Request $request, Invoice $invoice)
+    {
+        if (!auth()->user()?->hasAnyRole(['finance', 'admin', 'super_admin'])) {
+            return redirect()->route('invoices.show', $invoice)
+                ->with('error', 'Only Finance can update the down payment.');
+        }
+
+        $request->validate([
+            'down_payment' => 'nullable|numeric|min:0',
+        ]);
+
+        $invoice->workOrder->update([
+            'down_payment' => $request->down_payment ?? 0,
+        ]);
+
+        return redirect()->route('invoices.show', $invoice)
+            ->with('success', 'Down payment updated on the work order.');
     }
 
     public function destroy(Invoice $invoice)

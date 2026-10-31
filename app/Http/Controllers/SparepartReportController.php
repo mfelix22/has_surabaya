@@ -58,6 +58,7 @@ class SparepartReportController extends Controller
 
         // Summary by Vehicle
         $byVehicle = (clone $query)
+            ->whereNotNull('wo.id')
             ->select(
                 'wo.vehicle_id',
                 'wo.vehicle_plate',
@@ -76,6 +77,8 @@ class SparepartReportController extends Controller
                 'bo.id as bon_out_id',
                 'bo.issued_date',
                 'bo.bon_out_number',
+                'bo.bon_out_type',
+                'bo.purpose',
                 'wo.id as work_order_id',
                 'wo.wo_number',
                 'wo.vehicle_id',
@@ -184,6 +187,7 @@ class SparepartReportController extends Controller
             $row++;
 
             $data = (clone $query)
+                ->whereNotNull('wo.id')
                 ->select(
                     'wo.vehicle_plate',
                     'wo.vehicle_merk',
@@ -226,6 +230,8 @@ class SparepartReportController extends Controller
                 ->select(
                     'bo.issued_date',
                     'bo.bon_out_number',
+                    'bo.bon_out_type',
+                    'bo.purpose',
                     'wo.wo_number',
                     'wo.vehicle_plate',
                     'wo.vehicle_merk',
@@ -242,9 +248,9 @@ class SparepartReportController extends Controller
                     $n + 1,
                     $r->issued_date,
                     $r->bon_out_number,
-                    $r->wo_number,
-                    $r->vehicle_plate,
-                    $r->vehicle_merk,
+                    $r->wo_number ?? 'Adjustment',
+                    $r->vehicle_plate ?? '-',
+                    $r->vehicle_merk ?? '-',
                     $r->item_code,
                     $r->item_name,
                     (float) $r->actual_quantity,
@@ -280,9 +286,14 @@ class SparepartReportController extends Controller
     {
         $q = DB::table('bon_out_items as boi')
             ->join('bon_outs as bo', 'bo.id', '=', 'boi.bon_out_id')
-            ->join('work_orders as wo', 'wo.id', '=', 'bo.work_order_id')
+            ->leftJoin('work_orders as wo', 'wo.id', '=', 'bo.work_order_id')
             ->join('items as i', 'i.id', '=', 'boi.item_id')
             ->where('bo.status', 'completed')
+            ->where(function ($q) {
+                // Include WO bon outs (1xxxxx) and standalone Adjustment Outs (3xxxxx)
+                $q->whereNotNull('bo.work_order_id')
+                    ->orWhere('bo.bon_out_type', 3);
+            })
             ->whereNotNull('boi.actual_quantity')
             ->where('boi.actual_quantity', '>', 0);
 

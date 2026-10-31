@@ -425,6 +425,16 @@
                                                                 class="btn btn-danger btn-sm remove-item">Remove</button>
                                                         </div>
                                                     </div>
+                                                    <div class="row mt-2">
+                                                        <div class="col-md-12">
+                                                            <label>Remarks</label>
+                                                            <input type="text"
+                                                                name="items[{{ $dIdx }}][remarks]"
+                                                                class="form-control"
+                                                                value="{{ old('items.' . $dIdx . '.remarks', $detail->remarks) }}"
+                                                                placeholder="Optional notes...">
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             @else
                                                 <div class="service-section" style="width:100%;">
@@ -464,6 +474,16 @@
                                                             <label>&nbsp;</label><br>
                                                             <button type="button"
                                                                 class="btn btn-danger btn-sm remove-item">Remove</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="row mt-2">
+                                                        <div class="col-md-12">
+                                                            <label>Remarks</label>
+                                                            <input type="text"
+                                                                name="items[{{ $dIdx }}][remarks]"
+                                                                class="form-control"
+                                                                value="{{ old('items.' . $dIdx . '.remarks', $detail->remarks) }}"
+                                                                placeholder="Optional notes...">
                                                         </div>
                                                     </div>
                                                 </div>
@@ -567,6 +587,13 @@
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
                                 </div>
                             </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${itemIndex}][remarks]"
+                                        class="form-control" placeholder="Optional notes...">
+                                </div>
+                            </div>
                         </div>
                     </div>`;
             } else {
@@ -617,6 +644,13 @@
                                 <div class="col-md-1">
                                     <label>&nbsp;</label><br>
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${itemIndex}][remarks]"
+                                        class="form-control" placeholder="Optional notes...">
                                 </div>
                             </div>
                         </div>
@@ -849,6 +883,11 @@
                     <div class="col-md-1"><label>&nbsp;</label><br>
                         <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
                     </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12"><label>Remarks</label>
+                        <input type="text" name="items[${idx}][remarks]" class="form-control" value="${detail.remarks || ''}" placeholder="Optional notes...">
+                    </div>
                 </div></div></div>`;
             } else {
                 const itemUoms = detail.item && detail.item.item_uoms ? detail.item.item_uoms : [];
@@ -890,6 +929,11 @@
                     </div>
                     <div class="col-md-1"><label>&nbsp;</label><br>
                         <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12"><label>Remarks</label>
+                        <input type="text" name="items[${idx}][remarks]" class="form-control" value="${detail.remarks || ''}" placeholder="Optional notes...">
                     </div>
                 </div></div></div>`;
             }

@@ -351,6 +351,13 @@
                                                     class="btn btn-danger btn-sm remove-item">Remove</button>
                                             </div>
                                         </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-12">
+                                                <label>Remarks</label>
+                                                <input type="text" name="items[0][remarks]" class="form-control"
+                                                    placeholder="Optional notes...">
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <!-- For Service Order (Services) -->
@@ -381,6 +388,13 @@
                                                 <label>&nbsp;</label><br>
                                                 <button type="button"
                                                     class="btn btn-danger btn-sm remove-item">Remove</button>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-12">
+                                                <label>Remarks</label>
+                                                <input type="text" name="items[0][remarks]" class="form-control"
+                                                    placeholder="Optional notes...">
                                             </div>
                                         </div>
                                     </div>
@@ -487,6 +501,13 @@
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
                                 </div>
                             </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${itemIndex}][remarks]" class="form-control"
+                                        placeholder="Optional notes...">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -537,6 +558,13 @@
                                 <div class="col-md-1">
                                     <label>&nbsp;</label><br>
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${itemIndex}][remarks]" class="form-control"
+                                        placeholder="Optional notes...">
                                 </div>
                             </div>
                         </div>
@@ -797,6 +825,13 @@
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
                                 </div>
                             </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${index}][remarks]" class="form-control"
+                                        value="${detail.remarks || ''}" placeholder="Optional notes...">
+                                </div>
+                            </div>
                         </div>
                     </div>`;
                 } else {
@@ -876,6 +911,13 @@
                                 <div class="col-md-1">
                                     <label>&nbsp;</label><br>
                                     <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label>Remarks</label>
+                                    <input type="text" name="items[${index}][remarks]" class="form-control"
+                                        value="${detail.remarks || ''}" placeholder="Optional notes...">
                                 </div>
                             </div>
                         </div>
@@ -1118,7 +1160,7 @@
 
                 // Build form data manually to ensure items are captured
                 const formData = new FormData();
-                const form = document.querySelector('form');
+                const form = document.querySelector('form[action="{{ route("purchase_orders.store") }}"]');
 
                 // Add all basic form fields
                 for (const element of form.elements) {

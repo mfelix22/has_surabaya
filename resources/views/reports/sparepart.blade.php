@@ -271,20 +271,26 @@
                                         </a>
                                     </td>
                                     <td>
-                                        <a href="{{ route('work_orders.show', $row->work_order_id) }}" target="_blank">
-                                            {{ $row->wo_number }}
-                                        </a>
+                                        @if ($row->work_order_id)
+                                            <a href="{{ route('work_orders.show', $row->work_order_id) }}" target="_blank">
+                                                {{ $row->wo_number }}
+                                            </a>
+                                        @else
+                                            <span class="badge badge-warning" title="{{ $row->purpose }}">Adjustment</span>
+                                        @endif
                                     </td>
                                     <td>
                                         @if ($row->vehicle_id)
                                             <a href="{{ route('vehicles.show', $row->vehicle_id) }}" target="_blank">
                                                 <strong>{{ $row->vehicle_plate }}</strong>
                                             </a>
-                                        @else
+                                        @elseif ($row->vehicle_plate)
                                             <strong>{{ $row->vehicle_plate }}</strong>
+                                        @else
+                                            <span class="text-muted">—</span>
                                         @endif
                                     </td>
-                                    <td>{{ $row->vehicle_merk }}</td>
+                                    <td>{{ $row->vehicle_merk ?? '—' }}</td>
                                     <td>
                                         <a href="{{ route('items.show', $row->item_id) }}" target="_blank">
                                             <code>{{ $row->item_code }}</code>

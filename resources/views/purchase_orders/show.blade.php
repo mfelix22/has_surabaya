@@ -31,6 +31,12 @@
                         $hasBillableLines = $purchaseOrder->details->contains(
                             fn($detail) => $detail->getRemainingBillableQuantity() > 0,
                         );
+                        $isPrepaymentMode =
+                            $purchaseOrder->status === 'approved' &&
+                            in_array($purchaseOrder->payment_method, ['cbd', 'dp']);
+                        $hasPrepaymentBillableLines = $purchaseOrder->details->contains(
+                            fn($detail) => $detail->getRemainingPrepaymentQuantity() > 0,
+                        );
                     @endphp
                     <div class="card-tools">
                         @if ($purchaseOrder->status === 'on_progress' && \App\Helpers\PermissionHelper::canPrint('purchase_orders'))
@@ -54,6 +60,16 @@
                                     {{ $purchaseOrder->printed_at->format('d M Y') }}
                                 </span>
                             @endif
+                        @endif
+                        @if (($purchaseOrder->purchaseInvoices->isNotEmpty() ||
+                                ($purchaseOrder->po_type === 'service_order' &&
+                                    $purchaseOrder->status === 'completed' &&
+                                    $purchaseOrder->nomor_nota)) &&
+                                \App\Helpers\PermissionHelper::canViewPrices())
+                            <a href="{{ route('purchase_orders.print_bpp', $purchaseOrder) }}"
+                                class="btn btn-primary btn-sm" target="_blank">
+                                <i class="fas fa-money-check-alt"></i> Print BPP
+                            </a>
                         @endif
                         @if (
                             $purchaseOrder->status === 'on_progress' &&
@@ -166,19 +182,13 @@
                                 </button>
                             @endif
                         @endif
-                        @if (in_array($purchaseOrder->status, ['partial', 'received']) &&
-                                $hasBillableLines &&
-                                auth()->user()->hasAnyRole(['purchasing', 'admin', 'super_admin']))
+                        @if (auth()->user()->hasAnyRole(['purchasing', 'admin', 'super_admin']) &&
+                                ((in_array($purchaseOrder->status, ['partial', 'received', 'closed_shortage']) && $hasBillableLines) ||
+                                    ($isPrepaymentMode && $hasPrepaymentBillableLines)))
                             <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
                                 data-target="#recordInvoiceModal">
-                                <i class="fas fa-file-invoice"></i> Record Invoice
-                            </button>
-                        @elseif (in_array($purchaseOrder->status, ['closed_shortage']) &&
-                                $hasBillableLines &&
-                                auth()->user()->hasAnyRole(['purchasing', 'admin', 'super_admin']))
-                            <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
-                                data-target="#recordInvoiceModal">
-                                <i class="fas fa-file-invoice"></i> Record Invoice
+                                <i class="fas fa-file-invoice"></i>
+                                {{ $isPrepaymentMode ? 'Record Proforma Invoice' : 'Record Invoice' }}
                             </button>
                         @endif
                         @if (in_array($purchaseOrder->status, ['partial', 'received', 'closed_shortage']) &&
@@ -355,7 +365,12 @@
                                                         <table class="table table-sm table-borderless mb-0">
                                                             <tr>
                                                                 <th style="width:150px;">Invoice Number:</th>
-                                                                <td><strong>{{ $invoice->invoice_number }}</strong></td>
+                                                                <td><strong>{{ $invoice->invoice_number }}</strong>
+                                                                    @if ($invoice->is_prepayment)
+                                                                        <span class="badge badge-warning">Proforma /
+                                                                            Prepayment</span>
+                                                                    @endif
+                                                                </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Supplier:</th>
@@ -884,6 +899,14 @@
                             Supplier is auto-populated from this PO:
                             <strong>{{ $purchaseOrder->supplier->name ?? $purchaseOrder->supplier_name }}</strong>
                         </div>
+                        @if ($isPrepaymentMode)
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                This PO uses <strong>{{ strtoupper($purchaseOrder->payment_method) }}</strong> payment —
+                                you can record the supplier's <strong>proforma invoice</strong> here before the goods arrive.
+                                Quantities are billed against the ordered quantity.
+                            </div>
+                        @endif
                         <div class="form-group">
                             <label for="invoice_number">Invoice Number <span class="text-danger">*</span></label>
                             <input type="text" name="invoice_number" id="invoice_number" class="form-control"
@@ -923,18 +946,23 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($purchaseOrder->details->filter(fn($detail) => $detail->getRemainingBillableQuantity() > 0) as $detail)
+                                    @foreach ($purchaseOrder->details->filter(fn($detail) => ($isPrepaymentMode ? $detail->getRemainingPrepaymentQuantity() : $detail->getRemainingBillableQuantity()) > 0) as $detail)
+                                        @php
+                                            $remaining = $isPrepaymentMode
+                                                ? $detail->getRemainingPrepaymentQuantity()
+                                                : $detail->getRemainingBillableQuantity();
+                                        @endphp
                                         <tr>
-                                            <td>{{ $detail->item->name }}</td>
-                                            <td>{{ $detail->uom->code }}</td>
-                                            <td>{{ number_format($detail->getRemainingBillableQuantity(), 2) }}</td>
+                                            <td>{{ $detail->item->name ?? $detail->service_description }}</td>
+                                            <td>{{ $detail->uom->code ?? '-' }}</td>
+                                            <td>{{ number_format($remaining, 2) }}</td>
                                             <td>
                                                 <input type="hidden"
                                                     name="lines[{{ $detail->id }}][purchase_order_detail_id]"
                                                     value="{{ $detail->id }}">
                                                 <input type="number" name="lines[{{ $detail->id }}][qty_billed]"
                                                     class="form-control" min="0"
-                                                    max="{{ $detail->getRemainingBillableQuantity() }}" step="0.01"
+                                                    max="{{ $remaining }}" step="0.01"
                                                     value="0">
                                             </td>
                                             <td>

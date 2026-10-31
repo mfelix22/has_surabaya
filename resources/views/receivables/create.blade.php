@@ -84,6 +84,7 @@
                                     <th>UOM</th>
                                     <th>Remaining Quantity</th>
                                     <th>Quantity Received <span class="text-danger">*</span></th>
+                                    <th>Isi/Kemasan (per {{ $purchaseOrder->po_type ?? '' }} unit)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -93,6 +94,9 @@
                                             0,
                                             (float) $detail->quantity - (float) ($detail->received_quantity ?? 0),
                                         );
+                                        $itemUom = $detail->item->itemUoms->firstWhere('uom_id', $detail->uom_id);
+                                        $masterConversion = $itemUom ? (float) $itemUom->conversion_to_smallest : null;
+                                        $defaultConversion = $detail->conversion_to_smallest ?? $masterConversion;
                                     @endphp
                                     <tr>
                                         <td>
@@ -117,6 +121,18 @@
                                             @error('items.' . $index . '.quantity_received')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
+                                        </td>
+                                        <td>
+                                            <input type="number" name="items[{{ $index }}][conversion_to_smallest]"
+                                                class="form-control @error('items.' . $index . '.conversion_to_smallest') is-invalid @enderror"
+                                                step="0.000001" min="0.000001"
+                                                value="{{ old('items.' . $index . '.conversion_to_smallest', $defaultConversion) }}">
+                                            @error('items.' . $index . '.conversion_to_smallest')
+                                                <span class="invalid-feedback">{{ $message }}</span>
+                                            @enderror
+                                            @if ($masterConversion !== null)
+                                                <small class="form-text text-muted">Master: {{ number_format($masterConversion, 6) }} {{ $detail->item->smallestUom->code ?? '' }} per {{ $detail->uom->code }}</small>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach

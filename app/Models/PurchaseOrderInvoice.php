@@ -17,6 +17,7 @@ class PurchaseOrderInvoice extends Model
         'due_date',
         'total_amount',
         'status',
+        'is_prepayment',
         'notes',
         'recorded_by',
         'recorded_at',
@@ -26,6 +27,7 @@ class PurchaseOrderInvoice extends Model
         'invoice_date' => 'date',
         'due_date' => 'date',
         'total_amount' => 'decimal:2',
+        'is_prepayment' => 'boolean',
         'recorded_at' => 'datetime',
     ];
 

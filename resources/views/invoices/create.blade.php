@@ -69,9 +69,10 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="invoice_date">Invoice Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="invoice_date" id="invoice_date"
+                                    <input type="text" name="invoice_date" id="invoice_date"
                                         class="form-control @error('invoice_date') is-invalid @enderror"
-                                        value="{{ old('invoice_date', date('Y-m-d')) }}" required>
+                                        value="{{ old('invoice_date', date('d/m/Y')) }}" required
+                                        placeholder="DD/MM/YYYY" maxlength="10">
                                     @error('invoice_date')
                                         <span class="invalid-feedback">{{ $message }}</span>
                                     @enderror
@@ -83,9 +84,9 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="due_date">Due Date</label>
-                                    <input type="date" name="due_date" id="due_date"
+                                    <input type="text" name="due_date" id="due_date"
                                         class="form-control @error('due_date') is-invalid @enderror"
-                                        value="{{ old('due_date') }}">
+                                        value="{{ old('due_date') }}" placeholder="DD/MM/YYYY" maxlength="10">
                                     @error('due_date')
                                         <span class="invalid-feedback">{{ $message }}</span>
                                     @enderror

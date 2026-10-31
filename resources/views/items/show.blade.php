@@ -106,6 +106,65 @@
                     </table>
                 </div>
             </div>
+
+            {{-- Supplier Purchase History --}}
+            <div class="card card-outline card-info mt-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-truck mr-1"></i> Purchase History by Supplier</h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info">{{ $supplierHistory->total() }} record(s)</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Supplier</th>
+                                <th>PO Number</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($supplierHistory as $line)
+                                <tr>
+                                    <td>{{ optional($line->purchaseOrder->order_date)->format('Y-m-d') }}</td>
+                                    <td>
+                                        @if ($line->purchaseOrder->supplier)
+                                            <a href="{{ route('suppliers.show', $line->purchaseOrder->supplier) }}">
+                                                {{ $line->purchaseOrder->supplier->name }}
+                                            </a>
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('purchase_orders.show', $line->purchase_order_id) }}">
+                                            {{ $line->purchaseOrder->po_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ number_format($line->quantity, 2) }} {{ $line->uom->name ?? '' }}</td>
+                                    <td>Rp {{ number_format($line->unit_price, 0, ',', '.') }}</td>
+                                    <td>Rp {{ number_format($line->total_price, 0, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">
+                                        This item has not been purchased yet.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($supplierHistory->hasPages())
+                    <div class="card-footer">
+                        {{ $supplierHistory->links() }}
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 

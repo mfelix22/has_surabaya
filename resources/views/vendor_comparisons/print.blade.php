@@ -223,6 +223,29 @@
             height: 14px;
         }
 
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4px 0 6px 0;
+            font-size: 9px;
+        }
+
+        .price-table th,
+        .price-table td {
+            border: 1px solid #000;
+            padding: 2px 5px;
+        }
+
+        .price-table th {
+            background: #f0f0f0;
+            text-align: left;
+        }
+
+        .price-table td.amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+
         .page-break {
             page-break-before: always;
         }
@@ -394,6 +417,28 @@
                 <div class="dotted-line">{{ $vendor->ketentuan_lain }}</div>
                 <div class="dotted-line">&nbsp;</div>
                 <div class="dotted-line">&nbsp;</div>
+
+                @if ($vendorComparison->items->isNotEmpty())
+                    @php $pricesByItem = $vendor->prices->keyBy('vendor_comparison_item_id'); @endphp
+                    <table class="price-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th style="width:90px">Harga (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($vendorComparison->items as $item)
+                                <tr>
+                                    <td>{{ $item->item_name }}</td>
+                                    <td class="amount">
+                                        {{ isset($pricesByItem[$item->id]) && $pricesByItem[$item->id]->harga !== null ? number_format($pricesByItem[$item->id]->harga, 0, ',', '.') : '-' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
 
             </div>
         </div>

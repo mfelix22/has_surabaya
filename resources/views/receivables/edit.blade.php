@@ -105,6 +105,7 @@
                                     <th>UOM</th>
                                     <th>Quantity Ordered</th>
                                     <th>Quantity Received <span class="text-danger">*</span></th>
+                                    <th>Isi/Kemasan</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -112,6 +113,9 @@
                                 @foreach ($receivable->items as $index => $item)
                                     @php
                                         $variance = $item->quantity_received - $item->quantity_ordered;
+                                        $itemUom = $item->item->itemUoms->firstWhere('uom_id', $item->uom_id);
+                                        $masterConversion = $itemUom ? (float) $itemUom->conversion_to_smallest : null;
+                                        $defaultConversion = $item->conversion_to_smallest ?? $masterConversion;
                                     @endphp
                                     <tr>
                                         <td>
@@ -138,6 +142,18 @@
                                             @error('items.' . $index . '.quantity_received')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
+                                        </td>
+                                        <td>
+                                            <input type="number" name="items[{{ $index }}][conversion_to_smallest]"
+                                                class="form-control @error('items.' . $index . '.conversion_to_smallest') is-invalid @enderror"
+                                                step="0.000001" min="0.000001"
+                                                value="{{ old('items.' . $index . '.conversion_to_smallest', $defaultConversion) }}">
+                                            @error('items.' . $index . '.conversion_to_smallest')
+                                                <span class="invalid-feedback">{{ $message }}</span>
+                                            @enderror
+                                            @if ($masterConversion !== null)
+                                                <small class="form-text text-muted">Master: {{ number_format($masterConversion, 6) }}</small>
+                                            @endif
                                         </td>
                                         <td>
                                             @if ($variance < 0)

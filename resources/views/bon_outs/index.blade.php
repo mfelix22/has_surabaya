@@ -62,7 +62,7 @@
                                 <a href="{{ route('bon_outs.index') }}" class="btn btn-secondary btn-sm mr-2">
                                     <i class="fas fa-times mr-1"></i>Clear
                                 </a>
-                                <span class="text-muted small">{{ $bonOuts->total() }} result(s)</span>
+                                <span class="text-muted small">{{ $bonOuts->count() }} result(s)</span>
                             @endif
                         </div>
                     </form>
@@ -70,7 +70,7 @@
 
                 <div class="card-body">
 
-                    <table class="table table-bordered table-striped">
+                    <table id="bonOutsTable" class="table table-bordered table-striped">
                         <thead>
                             <tr>
                                 <th>Bon Out #</th>
@@ -78,14 +78,14 @@
                                 <th>Date</th>
                                 <th>Work Order</th>
                                 <th>Customer</th>
-                                <th>Vehicle</th>
+                                <th>Package</th>
                                 <th>Status</th>
                                 <th>Created By</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($bonOuts as $bonOut)
+                            @foreach ($bonOuts as $bonOut)
                                 <tr>
                                     <td><strong>{{ $bonOut->bon_out_number }}</strong></td>
                                     <td>
@@ -108,12 +108,14 @@
                                         @endif
                                     </td>
                                     <td>{{ $bonOut->workOrder->customer->name ?? '-' }}</td>
-                                    <td>{{ $bonOut->workOrder->vehicle_plate ?? '-' }}</td>
+                                    <td>{{ $bonOut->workOrder->paket_name ?? '-' }}</td>
                                     <td>
                                         @if ($bonOut->status === 'on_progress')
                                             <span class="badge badge-secondary">On Progress</span>
                                         @elseif ($bonOut->status === 'completed')
                                             <span class="badge badge-success">Completed</span>
+                                        @elseif ($bonOut->status === 'returned')
+                                            <span class="badge badge-warning">Returned</span>
                                         @else
                                             <span class="badge badge-danger">Cancelled</span>
                                         @endif
@@ -125,19 +127,24 @@
                                         </a>
                                     </td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted">No Bon Out records yet.</td>
-                                </tr>
-                            @endforelse
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
 
-                <div class="card-footer clearfix">
-                    {{ $bonOuts->links('pagination::bootstrap-4') }}
-                </div>
+
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            $(function() {
+                $('#bonOutsTable').DataTable({
+                    order: [[2, 'desc']],
+                    pageLength: 25,
+                });
+            });
+        </script>
+    @endpush
 @endsection

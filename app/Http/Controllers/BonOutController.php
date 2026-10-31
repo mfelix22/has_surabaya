@@ -8,6 +8,8 @@ use App\Models\BonOutItem;
 use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\ItemUOM;
+use App\Models\Package;
+use App\Models\PackageBomItem;
 use App\Models\Stock;
 use App\Models\StockTransaction;
 use App\Models\WorkOrder;
@@ -44,7 +46,7 @@ class BonOutController extends Controller
             });
         }
 
-        $bonOuts = $query->paginate(20)->appends($request->query());
+        $bonOuts = $query->get();
 
         $allYears  = BonOut::selectRaw('YEAR(issued_date) as year')
             ->distinct()->orderBy('year', 'desc')->pluck('year');
@@ -73,6 +75,25 @@ class BonOutController extends Controller
 
         // Load WO data with stock information
         $workOrder->load(['items.item.smallestUom', 'items.item.itemUoms.uom', 'items.item.stocks', 'customer']);
+
+        // If the WO has a package selected but no material lines (e.g. the package
+        // was chosen before BOM auto-fill was available), backfill the WO items
+        // from the package BOM so the materials list is populated.
+        if ($workOrder->items->isEmpty() && $workOrder->paket_code) {
+            $codes = collect(explode('+', $workOrder->paket_code))->map(fn ($c) => trim($c))->filter()->values();
+            $bomItems = PackageBomItem::whereIn('package_id', Package::whereIn('code', $codes)->pluck('id'))->get();
+            foreach ($bomItems as $bi) {
+                WorkOrderItem::create([
+                    'work_order_id'   => $workOrder->id,
+                    'item_id'         => $bi->item_id,
+                    'demand_quantity' => $bi->quantity,
+                    'remark'          => 'Auto-added from package BOM',
+                ]);
+            }
+            if ($bomItems->isNotEmpty()) {
+                $workOrder->load(['items.item.smallestUom', 'items.item.itemUoms.uom', 'items.item.stocks']);
+            }
+        }
 
         // Get all items for adding new materials
         $allItems = Item::with(['smallestUom', 'stocks'])->where('is_active', true)->orderBy('name')->get();
@@ -475,6 +496,7 @@ class BonOutController extends Controller
                         'quantity'         => -$actualQty,
                         'unit_cost'        => $avgCostAtIssue,
                         'balance_after'    => $stock->quantity,
+                        'avg_cost_after'   => (float) $stock->avg_cost,
                         'location'         => 'default',
                         'reference_type'   => $isStandalone ? 'ADJUSTMENT_OUT' : 'BON_OUT',
                         'reference_id'     => $bonOut->id,
@@ -570,5 +592,98 @@ class BonOutController extends Controller
 
         return redirect()->route('bon_outs.index')
             ->with('success', 'Bon Out deleted.');
+    }
+
+    /**
+     * Return a completed Bon Out:
+     *  - Restores actual quantities back to stock
+     *  - Records a return stock transaction for each item
+     *  - Removes extra billed items added to the Work Order during completion
+     *  - Marks the Bon Out as returned
+     */
+    public function returnItems(Request $request, BonOut $bonOut)
+    {
+        if (!PermissionHelper::canUpdate('bon_outs')) {
+            return PermissionHelper::denyAccess('bon_outs', 'update');
+        }
+
+        if ($bonOut->status !== 'completed') {
+            return back()->with('error', 'Only completed Bon Out can be returned.');
+        }
+
+        $validated = $request->validate([
+            'returned_remark' => 'required|string|max:1000',
+        ]);
+
+        $bonOut->load(['items.item.smallestUom', 'workOrder']);
+
+        DB::beginTransaction();
+        try {
+            $woNeedsRecalc = false;
+
+            foreach ($bonOut->items as $bonOutItem) {
+                $item      = $bonOutItem->item;
+                $actualQty = (float) $bonOutItem->actual_quantity;
+
+                if ($actualQty <= 0) {
+                    continue;
+                }
+
+                $stock = Stock::firstOrCreate(
+                    ['item_id' => $item->id, 'location' => 'default'],
+                    ['quantity' => 0, 'avg_cost' => 0]
+                );
+
+                $returnCost = (float) $bonOutItem->unit_cost;
+                $stock->addQuantity($actualQty, $returnCost);
+
+                StockTransaction::create([
+                    'item_id'          => $item->id,
+                    'transaction_type' => 'in',
+                    'quantity'         => $actualQty,
+                    'unit_cost'        => $returnCost,
+                    'balance_after'    => $stock->quantity,
+                    'avg_cost_after'   => (float) $stock->avg_cost,
+                    'location'         => 'default',
+                    'reference_type'   => $bonOut->work_order_id ? 'BON_OUT_RETURN' : 'ADJUSTMENT_OUT_RETURN',
+                    'reference_id'     => $bonOut->id,
+                    'notes'            => "Returned via Bon Out #{$bonOut->bon_out_number}",
+                    'created_by'       => auth()->id(),
+                ]);
+
+                if ($bonOut->work_order_id && $bonOutItem->work_order_item_id === null && (float) $bonOutItem->unit_price > 0) {
+                    WorkOrderItem::where([
+                        'work_order_id'   => $bonOut->work_order_id,
+                        'item_id'         => $bonOutItem->item_id,
+                        'uom_id'          => $bonOutItem->uom_id,
+                        'demand_quantity' => $actualQty,
+                        'actual_quantity' => $actualQty,
+                        'unit_price'      => $bonOutItem->unit_price,
+                        'total_price'     => $actualQty * $bonOutItem->unit_price,
+                    ])->limit(1)->delete();
+
+                    $woNeedsRecalc = true;
+                }
+            }
+
+            if ($woNeedsRecalc && $bonOut->workOrder) {
+                $bonOut->workOrder->calculateTotals();
+            }
+
+            $bonOut->update([
+                'status'          => 'returned',
+                'returned_by'     => auth()->id(),
+                'returned_at'     => now(),
+                'returned_remark' => $validated['returned_remark'] ?? null,
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('bon_outs.show', $bonOut)
+                ->with('success', 'Bon Out returned successfully. Stock has been restored.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to return Bon Out: ' . $e->getMessage());
+        }
     }
 }

@@ -210,6 +210,7 @@
             function makeDtConfig() {
                 return {
                     autoWidth: false,
+                    responsive: true,
                     pageLength: 25,
                     order: [
                         [2, 'desc']

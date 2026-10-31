@@ -26,6 +26,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use App\Helpers\PermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
 class PurchaseOrderController extends Controller
@@ -813,24 +814,19 @@ class PurchaseOrderController extends Controller
                 // ADD to existing received quantity (support partial receiving)
                 $pod->increment('received_quantity', $detail['received_qty']);
 
-                // Get the ItemUOM to convert to smallest UOM
-                $itemUom = ItemUOM::where('item_id', $pod->item_id)
-                    ->where('uom_id', $pod->uom_id)
-                    ->first();
+                // Use the PO-specific conversion factor (purchasing can override packaging per PO)
+                $poConversion = (float) $pod->conversion_to_smallest;
 
-                $quantityInSmallest = $detail['received_qty'] * $itemUom->conversion_to_smallest;
+                $quantityInSmallest = $detail['received_qty'] * $poConversion;
 
                 // Add to stock
                 $stock = Stock::where('item_id', $pod->item_id)
                     ->where('location', 'default')
                     ->first();
 
-                $oldQuantity = $stock->quantity;
-                $oldAvgCost = (float) $stock->avg_cost;
-                $stock->addQuantity($quantityInSmallest);
-
                 $taxMultiplier = ($purchaseOrder->include_ppn && $purchaseOrder->po_type === 'purchase_order') ? 1.11 : 1.0;
-                $receivedUnitCost = ($pod->unit_price * $taxMultiplier) / (float) $itemUom->conversion_to_smallest;
+                $receivedUnitCost = ($pod->unit_price * $taxMultiplier) / $poConversion;
+                $stock->addQuantity($quantityInSmallest, $receivedUnitCost > 0 ? $receivedUnitCost : null);
 
                 // Create transaction record
                 StockTransaction::create([
@@ -839,6 +835,7 @@ class PurchaseOrderController extends Controller
                     'quantity' => $quantityInSmallest,
                     'unit_cost' => $receivedUnitCost,
                     'balance_after' => $stock->quantity,
+                    'avg_cost_after' => (float) $stock->avg_cost,
                     'location' => 'default',
                     'reference_type' => 'PO',
                     'reference_id' => $purchaseOrder->id,
@@ -981,8 +978,13 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'Only purchasing staff can record invoices.');
         }
 
-        // Can only record invoice after receiving (partial or complete)
-        if (!in_array($purchaseOrder->status, ['partial', 'received', 'closed_shortage'])) {
+        // Prepayment mode: CBD/DP POs can record a supplier proforma invoice
+        // while the PO is still approved (before any goods are received).
+        $isPrepayment = $purchaseOrder->status === 'approved'
+            && in_array($purchaseOrder->payment_method, ['cbd', 'dp']);
+
+        // Invoices can be recorded after receiving, or upfront for CBD/DP prepayment.
+        if (!in_array($purchaseOrder->status, ['partial', 'received', 'closed_shortage']) && !$isPrepayment) {
             return redirect()->route('purchase_orders.show', $purchaseOrder)
                 ->with('error', 'Invoice can only be recorded after goods are received.');
         }
@@ -999,7 +1001,7 @@ class PurchaseOrderController extends Controller
             'lines.*.notes' => 'nullable|string',
         ]);
 
-        $purchaseOrder->load('details.purchaseOrderInvoiceLines');
+        $purchaseOrder->load('details.purchaseOrderInvoiceLines.purchaseOrderInvoice');
         $details = $purchaseOrder->details->keyBy('id');
         $invoiceLines = [];
         $totalAmount = 0;
@@ -1017,7 +1019,9 @@ class PurchaseOrderController extends Controller
                 continue;
             }
 
-            $remainingBillable = $detail->getRemainingBillableQuantity();
+            $remainingBillable = $isPrepayment
+                ? $detail->getRemainingPrepaymentQuantity()
+                : $detail->getRemainingBillableQuantity();
             if ($qtyBilled > $remainingBillable) {
                 return back()->withInput()->withErrors([
                     "lines.$index.qty_billed" => "Billed quantity cannot exceed remaining billable quantity ({$remainingBillable}).",
@@ -1056,6 +1060,7 @@ class PurchaseOrderController extends Controller
                 'due_date' => $validated['invoice_due_date'] ?? null,
                 'total_amount' => $totalAmount,
                 'status' => 'on_progress',
+                'is_prepayment' => $isPrepayment,
                 'notes' => $validated['invoice_notes'] ?? null,
                 'recorded_by' => auth()->id(),
                 'recorded_at' => now(),
@@ -1073,7 +1078,7 @@ class PurchaseOrderController extends Controller
         }
 
         // Auto-complete the PO when all lines are fully received/closed AND fully billed
-        $purchaseOrder->load('details.purchaseOrderInvoiceLines');
+        $purchaseOrder->load('details.purchaseOrderInvoiceLines.purchaseOrderInvoice');
         $allDone = $purchaseOrder->details->every(
             fn($d) => $d->getOpenQuantity() <= 0 && $d->getRemainingBillableQuantity() <= 0
         );
@@ -1131,10 +1136,9 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'Only approved Service Orders can be closed.');
         }
 
-        $linkedPR = $purchaseOrder->purchaseRequest;
-        if (!$linkedPR || !$linkedPR->berita_acara_path) {
+        if (!$purchaseOrder->berita_acara_path) {
             return redirect()->route('purchase_orders.show', $purchaseOrder)
-                ->with('error', 'Please upload the Berita Acara on the linked PPJ before closing this Service Order.');
+                ->with('error', 'Please upload the Berita Acara for this Service Order before closing it.');
         }
 
         $validated = $request->validate([
@@ -1160,6 +1164,47 @@ class PurchaseOrderController extends Controller
 
         return redirect()->route('purchase_orders.show', $purchaseOrder)
             ->with('success', 'Service Order has been closed successfully.');
+    }
+
+    public function uploadBeritaAcara(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $user = auth()->user();
+        $isRequester = $purchaseOrder->purchaseRequest && $purchaseOrder->purchaseRequest->requested_by === $user?->id;
+        $isAdmin = $user?->hasAnyRole(['admin', 'super_admin']);
+
+        if (!$user || (!$isRequester && !$isAdmin)) {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'You do not have permission to upload the Berita Acara for this Service Order.');
+        }
+
+        if ($purchaseOrder->po_type !== 'service_order') {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'Berita Acara can only be uploaded for Service Orders (PPJ).');
+        }
+
+        if ($purchaseOrder->status !== 'approved') {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'Berita Acara can only be uploaded for approved Service Orders.');
+        }
+
+        $validated = $request->validate([
+            'berita_acara' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+        ]);
+
+        if ($purchaseOrder->berita_acara_path) {
+            Storage::disk('public')->delete($purchaseOrder->berita_acara_path);
+        }
+
+        $path = $validated['berita_acara']->store('berita_acara', 'public');
+
+        $purchaseOrder->update([
+            'berita_acara_path'        => $path,
+            'berita_acara_uploaded_by' => $user->id,
+            'berita_acara_uploaded_at' => now(),
+        ]);
+
+        return redirect()->route('purchase_requests.show', $purchaseOrder->purchase_request_id)
+            ->with('success', 'Berita Acara uploaded successfully for SO ' . $purchaseOrder->po_number . '.');
     }
 
     /**
@@ -1241,8 +1286,27 @@ class PurchaseOrderController extends Controller
         // Load related data
         $tempPo->creator = $user;
         $tempPo->approver = null;
-        $tempPo->purchaseRequest = null;
-        $tempPo->supplier = null;
+        $tempPo->purchaseRequest = $request->filled('purchase_request_id')
+            ? PurchaseRequest::find($request->input('purchase_request_id'))
+            : null;
+
+        // Back-fill supplier details from the master supplier if a supplier_id was chosen
+        $supplier = $request->filled('supplier_id') ? Supplier::find($request->input('supplier_id')) : null;
+        $tempPo->supplier = $supplier;
+        if ($supplier) {
+            if (empty($tempPo->supplier_name)) {
+                $tempPo->supplier_name = $supplier->name;
+            }
+            if (empty($tempPo->supplier_address) && $supplier->address) {
+                $tempPo->supplier_address = $supplier->address;
+            }
+            if (empty($tempPo->supplier_phone) && $supplier->phone) {
+                $tempPo->supplier_phone = $supplier->phone;
+            }
+            if (empty($tempPo->supplier_contact_person) && $supplier->contact_person) {
+                $tempPo->supplier_contact_person = $supplier->contact_person;
+            }
+        }
 
         // Build details collection
         $details = collect();
@@ -1331,6 +1395,69 @@ class PurchaseOrderController extends Controller
         $safeFilename = str_replace('/', '-', $purchaseOrder->po_number);
         AuditLog::logPrint($purchaseOrder, $purchaseOrder->po_number);
         return $pdf->download('PO-' . $safeFilename . '.pdf');
+    }
+
+    public function printBpp(PurchaseOrder $purchaseOrder)
+    {
+        if (!PermissionHelper::canViewPrices()) {
+            return PermissionHelper::denyAccess('purchase_orders', 'view');
+        }
+
+        if ($purchaseOrder->po_type === 'service_order') {
+            return $this->printBppService($purchaseOrder);
+        }
+
+        if (!$purchaseOrder->purchaseInvoices()->exists()) {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'BPP can only be printed after a supplier invoice has been recorded.');
+        }
+
+        $purchaseOrder->load([
+            'purchaseRequest',
+            'supplier',
+            'creator',
+            'approver',
+            'miscCosts',
+            'purchaseInvoices.supplier',
+            'purchaseInvoices.recorder',
+            'purchaseInvoices.lines.purchaseOrderDetail.item',
+            'purchaseInvoices.lines.purchaseOrderDetail.uom',
+        ]);
+
+        $pdf = Pdf::loadView('purchase_orders.print_bpp', compact('purchaseOrder'))
+            ->setPaper('a4', 'portrait');
+        $safeFilename = str_replace('/', '-', $purchaseOrder->po_number);
+        return $pdf->stream('BPP-' . $safeFilename . '.pdf');
+    }
+
+    public function printBppService(PurchaseOrder $purchaseOrder)
+    {
+        if (!PermissionHelper::canViewPrices()) {
+            return PermissionHelper::denyAccess('purchase_orders', 'view');
+        }
+
+        $hasNota = $purchaseOrder->status === 'completed' && $purchaseOrder->nomor_nota;
+        if (!$hasNota && !$purchaseOrder->purchaseInvoices()->exists()) {
+            return redirect()->route('purchase_orders.show', $purchaseOrder)
+                ->with('error', 'BPP can only be printed after a supplier invoice has been recorded or the Service Order is closed with a Nomor Nota.');
+        }
+
+        $purchaseOrder->load([
+            'purchaseRequest.requester',
+            'supplier',
+            'creator',
+            'approver',
+            'closer',
+            'details',
+            'miscCosts',
+            'purchaseInvoices.supplier',
+            'purchaseInvoices.recorder',
+        ]);
+
+        $pdf = Pdf::loadView('purchase_orders.print_bpp_ppj', compact('purchaseOrder'))
+            ->setPaper('a4', 'portrait');
+        $safeFilename = str_replace('/', '-', $purchaseOrder->po_number);
+        return $pdf->stream('BPP-' . $safeFilename . '.pdf');
     }
 
     public function exportExcel(Request $request)

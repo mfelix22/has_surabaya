@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="{{ asset('admin/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
     <link rel="stylesheet" href="{{ asset('admin/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
     <link rel="stylesheet" href="{{ asset('admin/plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
+    <link rel="stylesheet" href="{{ asset('admin/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
     @stack('styles')
 </head>
 
@@ -185,7 +186,7 @@
                                             </a>
                                         </li>
                                     @endif
-                                    @if (\App\Helpers\PermissionHelper::canView('panels'))
+                                    {{-- @if (\App\Helpers\PermissionHelper::canView('panels'))
                                         <li class="nav-item">
                                             <a href="{{ route('panels.index') }}"
                                                 class="nav-link {{ request()->routeIs('panels.*') ? 'active' : '' }}">
@@ -193,7 +194,7 @@
                                                 <p>Panels</p>
                                             </a>
                                         </li>
-                                    @endif
+                                    @endif --}}
                                     @if (\App\Helpers\PermissionHelper::canView('labors'))
                                         <li class="nav-item">
                                             <a href="{{ route('labors.index') }}"
@@ -374,7 +375,7 @@
                                             </a>
                                         </li>
                                     @endif
-                                    @if (\App\Helpers\PermissionHelper::canView('estimasis'))
+                                    {{-- @if (\App\Helpers\PermissionHelper::canView('estimasis'))
                                         <li class="nav-item">
                                             <a href="{{ route('estimasis.index') }}"
                                                 class="nav-link {{ request()->routeIs('estimasis.*') ? 'active' : '' }}">
@@ -382,7 +383,7 @@
                                                 <p>Estimasi</p>
                                             </a>
                                         </li>
-                                    @endif
+                                    @endif --}}
                                     @if (\App\Helpers\PermissionHelper::canView('invoices'))
                                         <li class="nav-item">
                                             <a href="{{ route('invoices.index') }}"
@@ -451,6 +452,27 @@
                                             class="nav-link {{ request()->routeIs('reports.sparepart*') ? 'active' : '' }}">
                                             <i class="fas fa-boxes nav-icon"></i>
                                             <p>Sparepart Usage</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('reports.package_cogs') }}"
+                                            class="nav-link {{ request()->routeIs('reports.package_cogs*') ? 'active' : '' }}">
+                                            <i class="fas fa-chart-pie nav-icon"></i>
+                                            <p>COGS by Package</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('reports.stock_month_end') }}"
+                                            class="nav-link {{ request()->routeIs('reports.stock_month_end*') ? 'active' : '' }}">
+                                            <i class="fas fa-calendar-check nav-icon"></i>
+                                            <p>Month-End Stock Cost</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('reports.bon_in') }}"
+                                            class="nav-link {{ request()->routeIs('reports.bon_in*') ? 'active' : '' }}">
+                                            <i class="fas fa-dolly nav-icon"></i>
+                                            <p>Bon In Listing</p>
                                         </a>
                                     </li>
                                 </ul>
@@ -532,7 +554,15 @@
     <script src="{{ asset('admin/plugins/select2/js/select2.full.min.js') }}"></script>
     <script src="{{ asset('admin/plugins/datatables/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('admin/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('admin/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ asset('admin/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
     <script src="{{ asset('admin/dist/js/adminlte.min.js') }}"></script>
+
+    <script>
+        $.extend(true, $.fn.DataTable.defaults, {
+            responsive: true
+        });
+    </script>
 
     <script>
         $(document).ready(function() {

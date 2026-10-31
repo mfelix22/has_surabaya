@@ -133,6 +133,57 @@
                     </div>
                 </div>
             @endif
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">Purchase History (Items)</h3>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>PO Number</th>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($purchaseHistory as $line)
+                                <tr>
+                                    <td>{{ optional($line->purchaseOrder->order_date)->format('Y-m-d') }}</td>
+                                    <td>
+                                        <a href="{{ route('purchase_orders.show', $line->purchase_order_id) }}">
+                                            {{ $line->purchaseOrder->po_number }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        @if ($line->item)
+                                            <strong>{{ $line->item->code }}</strong> - {{ $line->item->name }}
+                                        @else
+                                            {{ $line->service_description ?? '-' }}
+                                        @endif
+                                    </td>
+                                    <td>{{ number_format($line->quantity, 2) }} {{ $line->uom->name ?? '' }}</td>
+                                    <td>Rp {{ number_format($line->unit_price, 0, ',', '.') }}</td>
+                                    <td>Rp {{ number_format($line->total_price, 0, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No purchase history yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($purchaseHistory->hasPages())
+                    <div class="card-footer">
+                        {{ $purchaseHistory->links() }}
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 @endsection

@@ -46,7 +46,7 @@ class ReceivableController extends Controller
             });
         }
 
-        $receivables = $query->paginate(25)->appends($request->query());
+        $receivables = $query->get();
 
         $allYears = Receivable::selectRaw('YEAR(received_date) as year')
             ->distinct()->orderBy('year', 'desc')->pluck('year');
@@ -133,7 +133,17 @@ class ReceivableController extends Controller
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.quantity_received' => 'required|numeric|min:0',
+            'items.*.conversion_to_smallest' => 'nullable|numeric|min:0.000001',
         ]);
+
+        $incompleteItems = Item::whereIn('id', collect($validated['items'])->pluck('item_id')->unique())
+            ->where('is_complete', false)
+            ->pluck('name');
+        if ($incompleteItems->isNotEmpty()) {
+            return back()->withInput()->withErrors([
+                'items' => 'Cannot create Bon In: the following item(s) are incomplete and must be finished in Item master first: ' . $incompleteItems->implode(', ') . '.',
+            ]);
+        }
 
         $poDetails = $purchaseOrder->details->keyBy(function ($detail) {
             return $detail->item_id . '-' . $detail->uom_id;
@@ -170,6 +180,9 @@ class ReceivableController extends Controller
                 'uom_id' => $item['uom_id'],
                 'quantity_ordered' => $remainingQty,
                 'quantity_received' => $receivedQty,
+                'conversion_to_smallest' => isset($item['conversion_to_smallest']) && $item['conversion_to_smallest'] !== ''
+                    ? $item['conversion_to_smallest']
+                    : null,
             ];
         }
 
@@ -223,6 +236,7 @@ class ReceivableController extends Controller
                     'uom_id' => $item['uom_id'],
                     'quantity_ordered' => $item['quantity_ordered'],
                     'quantity_received' => $item['quantity_received'],
+                    'conversion_to_smallest' => $item['conversion_to_smallest'],
                 ]);
             }
 
@@ -276,6 +290,15 @@ class ReceivableController extends Controller
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.quantity_received' => 'required|numeric|min:0.01',
         ]);
+
+        $incompleteItems = Item::whereIn('id', collect($validated['items'])->pluck('item_id')->unique())
+            ->where('is_complete', false)
+            ->pluck('name');
+        if ($incompleteItems->isNotEmpty()) {
+            return back()->withInput()->withErrors([
+                'items' => 'Cannot create Bon In: the following item(s) are incomplete and must be finished in Item master first: ' . $incompleteItems->implode(', ') . '.',
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -335,6 +358,7 @@ class ReceivableController extends Controller
     {
         $receivable->load([
             'purchaseOrder.supplier',
+            'purchaseOrder.details',
             'supplier',
             'items.item.itemUoms.uom',
             'items.item.smallestUom',
@@ -401,6 +425,7 @@ class ReceivableController extends Controller
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.quantity_ordered' => 'required|numeric|min:0',
             'items.*.quantity_received' => 'required|numeric|min:0',
+            'items.*.conversion_to_smallest' => 'nullable|numeric|min:0.000001',
         ]);
 
         DB::beginTransaction();
@@ -430,6 +455,9 @@ class ReceivableController extends Controller
                     'uom_id' => $item['uom_id'],
                     'quantity_ordered' => $item['quantity_ordered'],
                     'quantity_received' => $item['quantity_received'],
+                    'conversion_to_smallest' => isset($item['conversion_to_smallest']) && $item['conversion_to_smallest'] !== ''
+                        ? $item['conversion_to_smallest']
+                        : null,
                 ]);
             }
 
@@ -502,6 +530,13 @@ class ReceivableController extends Controller
             return back()->with('error', 'Only on progress or partial received Bon In can be completed.');
         }
 
+        $incompleteItems = $receivable->items()->whereHas('item', function ($q) {
+            $q->where('is_complete', false);
+        })->with('item')->get()->pluck('item.name')->unique();
+        if ($incompleteItems->isNotEmpty()) {
+            return back()->with('error', 'Cannot complete Bon In: the following item(s) are incomplete and must be finished in Item master first: ' . $incompleteItems->implode(', ') . '.');
+        }
+
         DB::beginTransaction();
         try {
             $po = $receivable->purchaseOrder;
@@ -528,14 +563,19 @@ class ReceivableController extends Controller
 
                 // If the received UOM is already the item's smallest UOM, conversion is always 1.
                 // Use == (not ===) to safely compare across int/string casts from DB.
-                $isSmallestUom        = (int) $item->smallest_uom_id === (int) $uom->id;
-                $itemMasterConversion = (float) $itemUom->conversion_to_smallest;
-                $poDetailConversion   = $poDetail ? (float) $poDetail->conversion_to_smallest : 0;
-                $conversionFactor     = $isSmallestUom
+                $isSmallestUom          = (int) $item->smallest_uom_id === (int) $uom->id;
+                $itemMasterConversion   = (float) $itemUom->conversion_to_smallest;
+                $poDetailConversion     = $poDetail ? (float) $poDetail->conversion_to_smallest : 0;
+                $warehouseConversion    = $receivableItem->conversion_to_smallest !== null
+                    ? (float) $receivableItem->conversion_to_smallest
+                    : null;
+                $conversionFactor       = $isSmallestUom
                     ? 1.0
-                    : (($poDetailConversion > 1 && $poDetailConversion !== $itemMasterConversion)
-                        ? $poDetailConversion
-                        : $itemMasterConversion);
+                    : ($warehouseConversion !== null
+                        ? $warehouseConversion
+                        : (($poDetailConversion > 1 && $poDetailConversion !== $itemMasterConversion)
+                            ? $poDetailConversion
+                            : $itemMasterConversion));
 
                 $quantityInSmallestUom = $receivableItem->quantity_received * $conversionFactor;
 
@@ -577,6 +617,7 @@ class ReceivableController extends Controller
                     'quantity'         => $quantityInSmallestUom,
                     'unit_cost'        => $receivedUnitCost,
                     'balance_after'    => $stock->quantity,
+                    'avg_cost_after'   => (float) $stock->avg_cost,
                     'location'         => 'default',
                     'reference_type'   => $hasPO ? 'PO' : 'BON_IN',
                     'reference_id'     => $hasPO ? $po->id : $receivable->id,

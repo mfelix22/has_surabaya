@@ -47,6 +47,11 @@ class VendorComparison extends Model
         return $this->hasMany(VendorComparisonVendor::class)->orderBy('vendor_order');
     }
 
+    public function items(): HasMany
+    {
+        return $this->hasMany(VendorComparisonItem::class)->orderBy('sort_order');
+    }
+
     public function selectedVendor(): BelongsTo
     {
         return $this->belongsTo(VendorComparisonVendor::class, 'selected_vendor_id');

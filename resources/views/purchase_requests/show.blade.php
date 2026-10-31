@@ -19,7 +19,7 @@
                     <div class="card-tools">
                         @if (in_array($purchaseRequest->status, ['completed', 'printed', 'closed']))
                             @if (\App\Helpers\PermissionHelper::canPrint('purchase_requests') || auth()->user()->hasAnyRole(['purchasing']))
-                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print', now()->addMinutes(5), $purchaseRequest) }}"
+                                <a href="{{ \URL::temporarySignedRoute('purchase_requests.print_preview', now()->addMinutes(5), $purchaseRequest) }}"
                                     class="btn btn-secondary btn-sm" target="_blank">
                                     <i class="fas fa-print"></i> Print
                                 </a>
@@ -56,6 +56,19 @@
                             <button type="button" class="btn btn-danger btn-sm" data-toggle="modal"
                                 data-target="#cancelPrModal">
                                 <i class="fas fa-ban"></i> Cancel
+                            </button>
+                        @endif
+                        @php
+                            $canRevokePr =
+                                in_array($purchaseRequest->status, ['dept_head_approved', 'gm_approved', 'completed', 'printed']) &&
+                                !$purchaseRequest->purchaseOrders()->exists() &&
+                                (auth()->id() === $purchaseRequest->requested_by ||
+                                    auth()->user()->hasAnyRole(['admin', 'super_admin']));
+                        @endphp
+                        @if ($canRevokePr)
+                            <button type="button" class="btn btn-warning btn-sm" data-toggle="modal"
+                                data-target="#revokeApprovalModal">
+                                <i class="fas fa-undo-alt"></i> Send Back for Revision
                             </button>
                         @endif
                         @if (in_array($purchaseRequest->status, ['completed', 'printed']) &&
@@ -115,7 +128,7 @@
                                     </button>
                                 </form>
                             @endif
-                        @elseif(in_array($purchaseRequest->status, ['completed', 'printed']))
+                        @elseif(in_array($purchaseRequest->status, ['completed', 'printed']) && !$purchaseRequest->isFullyOrdered())
                             @if (auth()->user()->hasAnyRole(['purchasing']))
                                 <a href="{{ route('purchase_orders.create', ['pr_id' => $purchaseRequest->id]) }}"
                                     class="btn btn-success btn-sm">
@@ -274,6 +287,16 @@
                                 </tr>
 
                             </table>
+                            @if ($purchaseRequest->revoked_at && auth()->user()->hasAnyRole(['admin', 'super_admin', 'manager', 'director', 'purchasing']))
+                                <div class="alert alert-warning mb-0">
+                                    <strong><i class="fas fa-undo-alt"></i> Sent Back for Revision:</strong>
+                                    {{ optional($purchaseRequest->revoker)->name ?? '—' }}
+                                    <br>
+                                    <small class="text-muted">{{ $purchaseRequest->revoked_at->format('M d, Y H:i') }}</small>
+                                    <br>
+                                    <small><em>Reason: {{ $purchaseRequest->revocation_reason }}</em></small>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -512,6 +535,40 @@
             </div>
         @endif
     @endforeach
+
+    {{-- Revoke Approval Modal --}}
+    <div class="modal fade" id="revokeApprovalModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form action="{{ route('purchase_requests.revoke_approval', $purchaseRequest) }}" method="POST">
+                    @csrf
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title"><i class="fas fa-undo-alt"></i> Send Back for Revision</h5>
+                        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle"></i>
+                            This will <strong>revoke all approvals</strong> and return
+                            <strong>{{ $purchaseRequest->pr_number }}</strong> to on progress for editing.
+                            The PPB/PPJ number is kept. Approval will need to start over after revision.
+                        </div>
+                        <div class="form-group">
+                            <label for="pr_revocation_reason">Reason for Revision <span class="text-danger">*</span></label>
+                            <textarea name="revocation_reason" id="pr_revocation_reason" class="form-control" rows="3"
+                                placeholder="e.g., Wrong quantity, item no longer needed, need to add items, etc." minlength="5" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-undo-alt"></i> Confirm — Send Back for Revision
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     {{-- Cancel Modal --}}
     <div class="modal fade" id="cancelPrModal" tabindex="-1" role="dialog">

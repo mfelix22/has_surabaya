@@ -86,23 +86,42 @@
 
                         {{-- Items selection from PR --}}
                         <div id="pr-items-section" style="display:none" class="mb-3">
-                            <label><strong>Pilih Item yang Akan Dibandingkan:</strong> <span
-                                    class="text-danger">*</span></label>
+                            <label><strong>Pilih Item dari PPB/PPJ:</strong></label>
                             <div id="pr-items-list" class="border rounded p-3 bg-light">
                                 <span class="text-muted">Pilih PPB/PPJ terlebih dahulu.</span>
                             </div>
-                            <small class="text-muted">Centang item yang ingin dimasukkan dalam perbandingan vendor.</small>
+                            <small class="text-muted">Centang item yang ingin dimasukkan dalam perbandingan
+                                vendor.</small>
                         </div>
 
-                        <div class="form-group" id="detail-barang-group">
-                            <label for="detail_barang_jasa">Detail Barang / Jasa <span class="text-danger">*</span></label>
-                            <textarea name="detail_barang_jasa" id="detail_barang_jasa" rows="2"
-                                class="form-control @error('detail_barang_jasa') is-invalid @enderror"
-                                placeholder="Jelaskan barang atau jasa yang akan dibeli...">{{ old('detail_barang_jasa') }}</textarea>
-                            @error('detail_barang_jasa')
-                                <span class="invalid-feedback">{{ $message }}</span>
+                        {{-- Item comparison table --}}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="mb-0"><strong>Item yang Dibandingkan:</strong> <span
+                                        class="text-danger">*</span></label>
+                                <button type="button" id="btn-add-manual-item" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-plus"></i> Tambah Item Manual
+                                </button>
+                            </div>
+                            <table class="table table-sm table-bordered mb-1" id="items-table" style="display:none">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Nama Item</th>
+                                        <th style="width:120px">Qty</th>
+                                        <th style="width:120px">Satuan</th>
+                                        <th style="width:50px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-table-body"></tbody>
+                            </table>
+                            <div id="items-empty-msg" class="text-muted small">Belum ada item. Pilih PPB/PPJ atau
+                                tambah item manual.</div>
+                            @error('items')
+                                <span class="text-danger small d-block">{{ $message }}</span>
                             @enderror
                         </div>
+
+                        <input type="hidden" name="detail_barang_jasa" id="detail_barang_jasa" value="{{ old('detail_barang_jasa') }}">
 
                         <hr>
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -148,11 +167,139 @@
 @push('scripts')
     <script src="{{ asset('admin/plugins/select2/js/select2.full.min.js') }}"></script>
     <script>
-        let vendorCount = 1;
         const MAX_VENDORS = 3;
 
         // Pre-build supplier data for JS use
         const suppliersData = @json($suppliers);
+
+        // ---------------------------------------------------------------
+        // Item comparison state — shared source of truth for the item
+        // list table and every vendor's per-item price table.
+        // ---------------------------------------------------------------
+        let itemsState = [];
+        let itemUidCounter = 1;
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            } [c]));
+        }
+
+        function formatRupiah(amount) {
+            return 'Rp ' + amount.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function addItem(name, qty, uom, prDetailId) {
+            const uid = 'i' + (itemUidCounter++);
+            itemsState.push({
+                uid,
+                name: name || '',
+                qty: qty || '',
+                uom: uom || '',
+                pr_detail_id: prDetailId || ''
+            });
+            renderItemsTable();
+            renderAllVendorPriceTables();
+            return uid;
+        }
+
+        function removeItem(uid) {
+            itemsState = itemsState.filter(it => it.uid !== uid);
+            renderItemsTable();
+            renderAllVendorPriceTables();
+        }
+
+        function syncDetailBarangJasa() {
+            document.getElementById('detail_barang_jasa').value = itemsState
+                .map(it => it.name).filter(Boolean).join('\n');
+        }
+
+        function renderItemsTable() {
+            const table = document.getElementById('items-table');
+            const tbody = document.getElementById('items-table-body');
+            const emptyMsg = document.getElementById('items-empty-msg');
+
+            tbody.innerHTML = itemsState.map(it => `
+                <tr data-uid="${it.uid}">
+                    <td>
+                        <input type="text" class="form-control form-control-sm" name="items[${it.uid}][name]"
+                            value="${escapeHtml(it.name)}" placeholder="Nama item" ${it.pr_detail_id ? 'readonly' : ''} required>
+                        <input type="hidden" name="items[${it.uid}][pr_detail_id]" value="${it.pr_detail_id || ''}">
+                    </td>
+                    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm"
+                        name="items[${it.uid}][qty]" value="${escapeHtml(it.qty)}" ${it.pr_detail_id ? 'readonly' : ''}></td>
+                    <td><input type="text" class="form-control form-control-sm"
+                        name="items[${it.uid}][uom]" value="${escapeHtml(it.uom)}" ${it.pr_detail_id ? 'readonly' : ''}></td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove-item" data-uid="${it.uid}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            table.style.display = itemsState.length ? '' : 'none';
+            emptyMsg.style.display = itemsState.length ? 'none' : '';
+
+            syncDetailBarangJasa();
+        }
+
+        function renderVendorPriceTable(wrapper, presetValues) {
+            const index = wrapper.dataset.index;
+            const body = wrapper.querySelector('.vendor-price-body');
+            if (!body) return;
+
+            const existing = presetValues || {};
+            if (!presetValues) {
+                body.querySelectorAll('.vendor-price-input').forEach(inp => {
+                    existing[inp.dataset.uid] = inp.value;
+                });
+            }
+
+            if (itemsState.length === 0) {
+                body.innerHTML = '<tr><td colspan="2" class="text-muted text-center">Belum ada item untuk dibandingkan.</td></tr>';
+            } else {
+                body.innerHTML = itemsState.map(it => `
+                    <tr>
+                        <td>${escapeHtml(it.name) || '<em class="text-muted">(nama item belum diisi)</em>'}</td>
+                        <td>
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm vendor-price-input"
+                                data-uid="${it.uid}" name="vendors[${index}][prices][${it.uid}]"
+                                value="${existing[it.uid] !== undefined ? existing[it.uid] : ''}" placeholder="0">
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            updateVendorSubtotal(wrapper);
+        }
+
+        function renderAllVendorPriceTables() {
+            document.querySelectorAll('#vendor-list .vendor-wrapper').forEach(wrapper => renderVendorPriceTable(
+                wrapper));
+        }
+
+        function updateVendorSubtotal(wrapper) {
+            const subtotalInput = wrapper.querySelector('.vendor-subtotal');
+            const totalInput = wrapper.querySelector('.total-ppn');
+            const includeCheckbox = wrapper.querySelector('[name*="include_ppn"]');
+
+            let subtotal = 0;
+            wrapper.querySelectorAll('.vendor-price-input').forEach(inp => {
+                subtotal += parseFloat(inp.value) || 0;
+            });
+
+            if (subtotalInput) subtotalInput.value = subtotal ? formatRupiah(subtotal) : '';
+            const total = includeCheckbox && includeCheckbox.checked ? subtotal * 1.11 : subtotal;
+            if (totalInput) totalInput.value = subtotal ? formatRupiah(total) : '';
+        }
 
         function buildVendorForm(index, num) {
             return `
@@ -252,19 +399,38 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Harga Barang / Jasa (Rp)</label>
-                                    <input type="number" name="vendors[${index}][harga_barang_jasa]"
-                                        class="form-control" placeholder="0" step="0.01" min="0">
-                                </div>
+                            <div class="col-md-12">
+                                <label>Rincian Harga per Item <span class="text-danger">*</span></label>
+                                <table class="table table-sm table-bordered mb-1">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Item</th>
+                                            <th style="width:180px">Harga (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="vendor-price-body"></tbody>
+                                </table>
                             </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label>Ketentuan Lain-lain dari Calon Supplier</label>
                                     <textarea name="vendors[${index}][ketentuan_lain]"
                                         class="form-control" rows="2"
                                         placeholder="Ketentuan lain dari calon supplier..."></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Subtotal</label>
+                                    <input type="text" class="form-control vendor-subtotal" readonly placeholder="Rp 0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Total Termasuk PPN 11%</label>
+                                    <input type="text" class="form-control total-ppn" readonly placeholder="Rp 0">
                                 </div>
                             </div>
                         </div>
@@ -278,12 +444,6 @@
                                             Harga sudah termasuk PPN 11%
                                         </label>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Total Termasuk PPN 11%</label>
-                                    <input type="text" class="form-control total-ppn" readonly placeholder="Rp 0">
                                 </div>
                             </div>
                         </div>
@@ -312,32 +472,15 @@
             wrapper.querySelector('.vendor-bank').value = opt.data('bank') || '';
         }
 
-        function formatRupiah(amount) {
-            return 'Rp ' + amount.toLocaleString('id-ID', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-
-        function updatePpnTotal(wrapper) {
-            const hargaInput = wrapper.querySelector('[name*="harga_barang_jasa"]');
-            const includeCheckbox = wrapper.querySelector('[name*="include_ppn"]');
-            const totalInput = wrapper.querySelector('.total-ppn');
-            if (!hargaInput || !totalInput) return;
-            const harga = parseFloat(hargaInput.value) || 0;
-            const total = includeCheckbox && includeCheckbox.checked ? harga * 1.11 : harga;
-            totalInput.value = harga ? formatRupiah(total) : '';
-        }
-
         document.getElementById('vendor-list').addEventListener('input', function(e) {
-            if (e.target.name && e.target.name.includes('harga_barang_jasa')) {
-                updatePpnTotal(e.target.closest('.vendor-wrapper'));
+            if (e.target.classList.contains('vendor-price-input')) {
+                updateVendorSubtotal(e.target.closest('.vendor-wrapper'));
             }
         });
 
         document.getElementById('vendor-list').addEventListener('change', function(e) {
             if (e.target.name && e.target.name.includes('include_ppn')) {
-                updatePpnTotal(e.target.closest('.vendor-wrapper'));
+                updateVendorSubtotal(e.target.closest('.vendor-wrapper'));
             }
         });
 
@@ -351,14 +494,16 @@
             const num = currentCount + 1;
             const div = document.createElement('div');
             div.innerHTML = buildVendorForm(idx, num);
-            document.getElementById('vendor-list').appendChild(div.firstElementChild);
+            const wrapper = div.firstElementChild;
+            document.getElementById('vendor-list').appendChild(wrapper);
 
             if (currentCount + 1 >= MAX_VENDORS) {
                 this.disabled = true;
                 this.classList.add('disabled');
             }
 
-            initSupplierSelect2(div.firstElementChild);
+            renderVendorPriceTable(wrapper);
+            initSupplierSelect2(wrapper);
             attachRemoveButtons();
         });
 
@@ -402,63 +547,95 @@
         function renderPrItems(prId) {
             const section = document.getElementById('pr-items-section');
             const list = document.getElementById('pr-items-list');
-            const detailGroup = document.getElementById('detail-barang-group');
-            const detailTextarea = document.getElementById('detail_barang_jasa');
+
+            // Drop any items that came from a previously selected PR.
+            itemsState = itemsState.filter(it => !it.pr_detail_id);
 
             if (!prId || !prsItems[prId] || prsItems[prId].length === 0) {
                 section.style.display = 'none';
-                detailGroup.style.display = '';
-                detailTextarea.required = true;
                 list.innerHTML = '<span class="text-muted">Tidak ada item pada PPB/PPJ ini.</span>';
+                renderItemsTable();
+                renderAllVendorPriceTables();
                 return;
             }
 
             const items = prsItems[prId];
             section.style.display = '';
-            detailGroup.style.display = 'none';
-            detailTextarea.required = false;
 
             let html = '';
             items.forEach(function(item) {
                 const label = item.code ?
-                    `${item.code} — ${item.name} (${item.qty} ${item.uom})` :
-                    `${item.name} (${item.qty} ${item.uom})`;
+                    `${item.code} — ${item.name}` :
+                    `${item.name}`;
                 html += `
                 <div class="form-check mb-1">
                     <input class="form-check-input pr-item-check" type="checkbox"
-                        id="pr_item_${item.id}" value="${label}" checked>
-                    <label class="form-check-label" for="pr_item_${item.id}">${label}</label>
+                        data-pr-detail-id="${item.id}" data-name="${escapeHtml(label)}"
+                        data-qty="${item.qty}" data-uom="${escapeHtml(item.uom)}"
+                        id="pr_item_${item.id}" checked>
+                    <label class="form-check-label" for="pr_item_${item.id}">${label} (${item.qty} ${item.uom})</label>
                 </div>`;
             });
             list.innerHTML = html;
+
+            // Add all checked items to the comparison table by default.
+            list.querySelectorAll('.pr-item-check:checked').forEach(cb => {
+                addItem(cb.dataset.name, cb.dataset.qty, cb.dataset.uom, cb.dataset.prDetailId);
+            });
         }
+
+        document.getElementById('pr-items-list').addEventListener('change', function(e) {
+            if (!e.target.classList.contains('pr-item-check')) return;
+            const prDetailId = e.target.dataset.prDetailId;
+            if (e.target.checked) {
+                addItem(e.target.dataset.name, e.target.dataset.qty, e.target.dataset.uom, prDetailId);
+            } else {
+                const existing = itemsState.find(it => it.pr_detail_id === prDetailId);
+                if (existing) removeItem(existing.uid);
+            }
+        });
+
+        document.getElementById('btn-add-manual-item').addEventListener('click', function() {
+            addItem('', '', '', '');
+        });
+
+        document.getElementById('items-table-body').addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-remove-item');
+            if (!btn) return;
+            const uid = btn.dataset.uid;
+            const item = itemsState.find(it => it.uid === uid);
+            if (item && item.pr_detail_id) {
+                const cb = document.getElementById('pr_item_' + item.pr_detail_id);
+                if (cb) cb.checked = false;
+            }
+            removeItem(uid);
+        });
+
+        document.getElementById('items-table-body').addEventListener('input', function(e) {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            const item = itemsState.find(it => it.uid === row.dataset.uid);
+            if (!item) return;
+            if (e.target.name.includes('[name]')) item.name = e.target.value;
+            if (e.target.name.includes('[qty]')) item.qty = e.target.value;
+            if (e.target.name.includes('[uom]')) item.uom = e.target.value;
+            syncDetailBarangJasa();
+            renderAllVendorPriceTables();
+        });
 
         // Populate items on PR change (use jQuery for Select2 compatibility)
         $('#purchase_request_id').on('change', function() {
             renderPrItems(this.value);
         });
 
-        // On form submit: build detail_barang_jasa from checked items if PR is selected
+        // On form submit: make sure at least one item has been added.
         document.getElementById('vc-form').addEventListener('submit', function(e) {
-            const prId = document.getElementById('purchase_request_id').value;
-            const detailTextarea = document.getElementById('detail_barang_jasa');
-
-            if (prId && prsItems[prId] && prsItems[prId].length > 0) {
-                const checked = Array.from(document.querySelectorAll('.pr-item-check:checked'))
-                    .map(cb => cb.value);
-                if (checked.length === 0) {
-                    e.preventDefault();
-                    alert('Pilih minimal 1 item dari PPB/PPJ untuk perbandingan vendor.');
-                    return;
-                }
-                detailTextarea.value = checked.join('\n');
-            } else {
-                if (!detailTextarea.value.trim()) {
-                    e.preventDefault();
-                    alert('Detail Barang / Jasa harus diisi.');
-                    return;
-                }
+            if (itemsState.length === 0) {
+                e.preventDefault();
+                alert('Tambahkan minimal 1 item untuk dibandingkan.');
+                return;
             }
+            syncDetailBarangJasa();
         });
 
         // Initialize on page load (if PR pre-selected via query string)
@@ -471,9 +648,8 @@
 
         // Initialize vendor form handlers
         attachRemoveButtons();
-
-        // Calculate initial PPn totals
-        document.querySelectorAll('#vendor-list .vendor-wrapper').forEach(updatePpnTotal);
+        renderItemsTable();
+        renderAllVendorPriceTables();
 
         // Initialize select2 dropdowns
         initSupplierSelect2();

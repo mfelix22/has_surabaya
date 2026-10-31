@@ -66,7 +66,7 @@
                                 <a href="{{ route('receivables.index') }}" class="btn btn-secondary btn-sm mr-2">
                                     <i class="fas fa-times mr-1"></i>Clear
                                 </a>
-                                <span class="text-muted small">{{ $receivables->total() }} result(s)</span>
+                                <span class="text-muted small">{{ $receivables->count() }} result(s)</span>
                             @endif
                         </div>
                     </form>
@@ -138,17 +138,21 @@
                     </table>
                 </div>
 
-                <div class="card-footer clearfix">
-                    {{ $receivables->links('pagination::bootstrap-4') }}
-                </div>
                 @push('scripts')
                     <script>
                         $(document).ready(function() {
                             $('#receivables-table').DataTable({
-                                "paging": false,
+                                "paging": true,
+                                "pageLength": 25,
+                                "lengthMenu": [
+                                    [10, 25, 50, 100, -1],
+                                    [10, 25, 50, 100, 'All']
+                                ],
                                 "order": [],
                                 "language": {
                                     "search": "Search:",
+                                    "lengthMenu": "Show _MENU_ rows",
+                                    "info": "Showing _START_ to _END_ of _TOTAL_ items",
                                 }
                             });
                         });
